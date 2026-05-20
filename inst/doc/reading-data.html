@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Reading bibliometric data into bibnets</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Reading bibliometric data into bibnets</h1>
+
+
+
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(bibnets)</span></code></pre></div>
+<div id="introduction-and-the-standard-schema" class="section level2">
+<h2>1. Introduction and the standard schema</h2>
+<p>Each network builder in <code>bibnets</code>
+(<code>author_network()</code>, <code>keyword_network()</code>,
+<code>reference_network()</code>, <code>document_network()</code>,
+<code>source_network()</code>, <code>country_network()</code>,
+<code>institution_network()</code>, <code>conetwork()</code>) requires a
+data frame with a fixed set of columns and a small number of
+list-columns holding multi-valued fields. The readers convert
+source-specific exports (Scopus CSV, Web of Science plaintext, OpenAlex
+flat or nested, Dimensions, Lens.org, BibTeX, RIS, Crossref) into this
+common representation.</p>
+<p>The standard schema returned by every reader is:</p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Column</th>
+<th>Type</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>id</code></td>
+<td>chr</td>
+<td>Document identifier (EID, OpenAlex W-ID, DOI, etc.)</td>
+</tr>
+<tr class="even">
+<td><code>title</code></td>
+<td>chr</td>
+<td>Document title</td>
+</tr>
+<tr class="odd">
+<td><code>year</code></td>
+<td>int</td>
+<td>Publication year</td>
+</tr>
+<tr class="even">
+<td><code>journal</code></td>
+<td>chr</td>
+<td>Source / journal / venue name</td>
+</tr>
+<tr class="odd">
+<td><code>doi</code></td>
+<td>chr</td>
+<td>DOI without the <code>https://doi.org/</code> prefix</td>
+</tr>
+<tr class="even">
+<td><code>cited_by_count</code></td>
+<td>int</td>
+<td>Citations received (as reported by source)</td>
+</tr>
+<tr class="odd">
+<td><code>abstract</code></td>
+<td>chr</td>
+<td>Abstract text; <code>NA</code> for sources that do not expose
+it</td>
+</tr>
+<tr class="even">
+<td><code>type</code></td>
+<td>chr</td>
+<td>Document type (article, review, book-chapter, …)</td>
+</tr>
+<tr class="odd">
+<td><code>authors</code></td>
+<td>list</td>
+<td>Character vector of author names per row</td>
+</tr>
+<tr class="even">
+<td><code>references</code></td>
+<td>list</td>
+<td>Character vector of cited references per row</td>
+</tr>
+<tr class="odd">
+<td><code>keywords</code></td>
+<td>list</td>
+<td>Character vector of keywords per row</td>
+</tr>
+</tbody>
+</table>
+<p>Source-specific extras (e.g. <code>index_keywords</code>,
+<code>keywords_plus</code>, <code>affiliations</code>,
+<code>countries</code>, <code>language</code>) follow the standard
+columns. The contract that downstream functions such as
+<code>build_bipartite()</code> and <code>author_network()</code> rely on
+is that each multi-valued field is stored as a list-column whose
+elements are character vectors.</p>
+<p>This vignette covers all nine readers, the <code>read_biblio()</code>
+entry point, the generic-CSV path, the <code>split_field()</code>
+helper, and the manual construction of bibnets-compatible data
+frames.</p>
+</div>
+<div id="read_biblio" class="section level2">
+<h2>2. <code>read_biblio()</code></h2>
+<p><code>read_biblio()</code> accepts a single file, a vector of file
+paths, or a directory. When <code>format = &quot;auto&quot;</code> (the default)
+it detects the format from the contents of the file:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>data <span class="ot">&lt;-</span> <span class="fu">read_biblio</span>(<span class="st">&quot;export.csv&quot;</span>)          <span class="co"># auto-detect format</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>data <span class="ot">&lt;-</span> <span class="fu">read_biblio</span>(<span class="st">&quot;scopus_dir/&quot;</span>)         <span class="co"># entire directory, rbind&#39;d</span></span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>data <span class="ot">&lt;-</span> <span class="fu">read_biblio</span>(<span class="fu">c</span>(<span class="st">&quot;a.csv&quot;</span>, <span class="st">&quot;b.csv&quot;</span>))   <span class="co"># multiple files, rbind&#39;d</span></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>data <span class="ot">&lt;-</span> <span class="fu">read_biblio</span>(<span class="st">&quot;file.csv&quot;</span>, <span class="at">format =</span> <span class="st">&quot;scopus&quot;</span>)   <span class="co"># force a format</span></span></code></pre></div>
+<p>When given a directory, <code>read_biblio()</code> collects every
+<code>.csv</code>, <code>.txt</code>, <code>.bib</code>,
+<code>.ris</code>, <code>.xls</code>, and <code>.xlsx</code> file in it,
+reads each one, and combines the results with <code>rbind()</code>. For
+more than one file a summary message is emitted:</p>
+<pre><code>Read 3 files: 1247 rows total</code></pre>
+<p>Format detection is performed on the first non-empty line of the
+file:</p>
+<ul>
+<li>BibTeX: line 1 begins with <code>@</code></li>
+<li>RIS: line 1 begins with <code>TY  -</code></li>
+<li>Web of Science plaintext: line 1 begins with <code>FN</code> or
+<code>PT</code></li>
+<li>CSV-based: detection inspects the header row. When the first line
+matches the Dimensions preamble (<code>&quot;About the data: ...&quot;</code>),
+line 2 is used instead. Header tokens determine the format:
+<code>eid</code> for Scopus, <code>lens id</code> for Lens.org,
+<code>publication id</code> or <code>dimensions url</code> for
+Dimensions, <code>authorships.author.display_name</code> for the
+OpenAlex flat CSV.</li>
+</ul>
+<p>If detection fails, <code>read_biblio()</code> raises an error that
+lists the supported formats and indicates how to pass
+<code>format</code> explicitly or use <code>format = &quot;generic&quot;</code>
+with <code>actors</code>.</p>
+<p>Two readers are not dispatched by <code>read_biblio()</code>:</p>
+<ul>
+<li><code>read_openalex()</code> accepts an in-memory tibble from
+<code>openalexR::oa_fetch()</code>, not a file path.</li>
+<li><code>read_crossref()</code> accepts the <code>data</code> element
+of <code>rcrossref::cr_works()</code>.</li>
+</ul>
+<p>Both take R objects rather than files and are called directly.</p>
+</div>
+<div id="worked-example-openalex-flat-csv" class="section level2">
+<h2>3. Worked example — OpenAlex flat CSV</h2>
+<p>The package includes a 30-row OpenAlex flat CSV at
+<code>inst/extdata/openalex_works.csv</code>, corresponding to the
+export produced by downloading “Works” results from the OpenAlex web
+interface. Multi-valued fields use <code>|</code> as the delimiter.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>f <span class="ot">&lt;-</span> <span class="fu">system.file</span>(<span class="st">&quot;extdata&quot;</span>, <span class="st">&quot;openalex_works.csv&quot;</span>, <span class="at">package =</span> <span class="st">&quot;bibnets&quot;</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>oa <span class="ot">&lt;-</span> <span class="fu">read_openalex_csv</span>(f)</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="fu">str</span>(oa, <span class="at">max.level =</span> <span class="dv">1</span>)</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="co">#&gt; &#39;data.frame&#39;:    30 obs. of  13 variables:</span></span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="co">#&gt;  $ id            : chr  &quot;W2769342982&quot; &quot;W2264893711&quot; &quot;W2612059685&quot; &quot;W3118164373&quot; ...</span></span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="co">#&gt;  $ title         : chr  &quot;Open University Learning Analytics dataset&quot; &quot;Educational Data Mining and Learning Analytics in Programming&quot; &quot;Predicting Student Performance using Advanced Learning Analytics&quot; &quot;Predicting Student Performance Using Data Mining and Learning Analytics Techniques: A Systematic Literature Review&quot; ...</span></span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="co">#&gt;  $ year          : int  2017 2015 2017 2020 2022 2016 2020 2024 2016 2020 ...</span></span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a><span class="co">#&gt;  $ journal       : chr  &quot;Scientific Data&quot; &quot;&quot; &quot;&quot; &quot;Applied Sciences&quot; ...</span></span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a><span class="co">#&gt;  $ doi           : chr  &quot;10.1038/sdata.2017.171&quot; &quot;10.1145/2858796.2858798&quot; &quot;10.1145/3041021.3054164&quot; &quot;10.3390/app11010237&quot; ...</span></span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a><span class="co">#&gt;  $ cited_by_count: int  432 312 235 417 247 163 122 133 131 177 ...</span></span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a><span class="co">#&gt;  $ abstract      : chr  NA NA NA NA ...</span></span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a><span class="co">#&gt;  $ type          : chr  &quot;article&quot; &quot;article&quot; &quot;article&quot; &quot;article&quot; ...</span></span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a><span class="co">#&gt;  $ authors       :List of 30</span></span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a><span class="co">#&gt;  $ references    :List of 30</span></span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a><span class="co">#&gt;  $ keywords      :List of 30</span></span>
+<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a><span class="co">#&gt;  $ affiliations  :List of 30</span></span>
+<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a><span class="co">#&gt;  $ countries     :List of 30</span></span>
+<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a><span class="fu">head</span>(oa[, <span class="fu">c</span>(<span class="st">&quot;id&quot;</span>, <span class="st">&quot;title&quot;</span>, <span class="st">&quot;year&quot;</span>, <span class="st">&quot;journal&quot;</span>, <span class="st">&quot;type&quot;</span>)], <span class="dv">5</span>)</span>
+<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a><span class="co">#&gt;            id</span></span>
+<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a><span class="co">#&gt; 1 W2769342982</span></span>
+<span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a><span class="co">#&gt; 2 W2264893711</span></span>
+<span id="cb4-22"><a href="#cb4-22" tabindex="-1"></a><span class="co">#&gt; 3 W2612059685</span></span>
+<span id="cb4-23"><a href="#cb4-23" tabindex="-1"></a><span class="co">#&gt; 4 W3118164373</span></span>
+<span id="cb4-24"><a href="#cb4-24" tabindex="-1"></a><span class="co">#&gt; 5 W4300484403</span></span>
+<span id="cb4-25"><a href="#cb4-25" tabindex="-1"></a><span class="co">#&gt;                                                                                                                title</span></span>
+<span id="cb4-26"><a href="#cb4-26" tabindex="-1"></a><span class="co">#&gt; 1                                                                         Open University Learning Analytics dataset</span></span>
+<span id="cb4-27"><a href="#cb4-27" tabindex="-1"></a><span class="co">#&gt; 2                                                      Educational Data Mining and Learning Analytics in Programming</span></span>
+<span id="cb4-28"><a href="#cb4-28" tabindex="-1"></a><span class="co">#&gt; 3                                                   Predicting Student Performance using Advanced Learning Analytics</span></span>
+<span id="cb4-29"><a href="#cb4-29" tabindex="-1"></a><span class="co">#&gt; 4 Predicting Student Performance Using Data Mining and Learning Analytics Techniques: A Systematic Literature Review</span></span>
+<span id="cb4-30"><a href="#cb4-30" tabindex="-1"></a><span class="co">#&gt; 5                           Artificial Intelligence and Learning Analytics in Teacher Education: A Systematic Review</span></span>
+<span id="cb4-31"><a href="#cb4-31" tabindex="-1"></a><span class="co">#&gt;   year            journal    type</span></span>
+<span id="cb4-32"><a href="#cb4-32" tabindex="-1"></a><span class="co">#&gt; 1 2017    Scientific Data article</span></span>
+<span id="cb4-33"><a href="#cb4-33" tabindex="-1"></a><span class="co">#&gt; 2 2015                    article</span></span>
+<span id="cb4-34"><a href="#cb4-34" tabindex="-1"></a><span class="co">#&gt; 3 2017                    article</span></span>
+<span id="cb4-35"><a href="#cb4-35" tabindex="-1"></a><span class="co">#&gt; 4 2020   Applied Sciences article</span></span>
+<span id="cb4-36"><a href="#cb4-36" tabindex="-1"></a><span class="co">#&gt; 5 2022 Education Sciences  review</span></span></code></pre></div>
+<p>The list-columns:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>oa<span class="sc">$</span>authors[[<span class="dv">1</span>]]</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Jakub Kužílek&quot;  &quot;Martin Hlosta&quot;  &quot;Zdeněk Zdráhal&quot;</span></span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>oa<span class="sc">$</span>affiliations[[<span class="dv">1</span>]]</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="co">#&gt; [1] &quot;The Open University&quot;                 </span></span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="co">#&gt; [2] &quot;Czech Technical University in Prague&quot;</span></span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="co">#&gt; [3] &quot;The Open University&quot;                 </span></span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="co">#&gt; [4] &quot;The Open University&quot;                 </span></span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a><span class="co">#&gt; [5] &quot;Czech Technical University in Prague&quot;</span></span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>oa<span class="sc">$</span>countries[[<span class="dv">1</span>]]</span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="co">#&gt; [1] &quot;CZ&quot; &quot;GB&quot; &quot;GB&quot; &quot;CZ&quot; &quot;GB&quot;</span></span></code></pre></div>
+<p>Two limitations of the flat export should be noted:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">all</span>(<span class="fu">vapply</span>(oa<span class="sc">$</span>references, <span class="cf">function</span>(x) <span class="fu">length</span>(x) <span class="sc">==</span> <span class="dv">0</span> <span class="sc">||</span> <span class="fu">all</span>(<span class="fu">is.na</span>(x)), <span class="fu">logical</span>(<span class="dv">1</span>)))</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="co">#&gt; [1] TRUE</span></span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a><span class="fu">all</span>(<span class="fu">is.na</span>(oa<span class="sc">$</span>abstract))</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
+<p><code>references</code> is empty and <code>abstract</code> is
+<code>NA</code> because these fields are not included in the OpenAlex
+web download. Cited references and abstracts from OpenAlex are obtained
+via <code>openalexR::oa_fetch()</code> and processed with
+<code>read_openalex()</code> (described in section 6).</p>
+<p>The remaining fields support several network constructions that do
+not require references — co-authorship, country, institution, keyword,
+source, and document networks:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>co <span class="ot">&lt;-</span> <span class="fu">country_network</span>(oa, <span class="at">counting =</span> <span class="st">&quot;fractional&quot;</span>)</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="fu">head</span>(co, <span class="dv">5</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="co">#&gt; # bibnets network: country_collaboration | 8 nodes · 5 edges | counting: fractional </span></span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="co">#&gt;    from  to  weight  count</span></span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="co">#&gt; 1  GB    NO     1.5      3</span></span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="co">#&gt; 2  CA    US   1.167      2</span></span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a><span class="co">#&gt; 3  AU    CN       1      1</span></span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a><span class="co">#&gt; 4  AU    EC       1      1</span></span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a><span class="co">#&gt; 5  CZ    GB       1      1</span></span></code></pre></div>
+</div>
+<div id="scopus" class="section level2">
+<h2>4. Scopus</h2>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>sc <span class="ot">&lt;-</span> <span class="fu">read_scopus</span>(<span class="st">&quot;scopus.csv&quot;</span>)</span></code></pre></div>
+<p><code>read_scopus()</code> ingests the standard Scopus CSV export
+(<code>File -&gt; Export -&gt; CSV</code> from the Scopus search UI).
+Mappings from Scopus columns to the bibnets schema:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Scopus column</th>
+<th>Standard column</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>EID</code> (or <code>Article No.</code>)</td>
+<td><code>id</code></td>
+</tr>
+<tr class="even">
+<td><code>Title</code></td>
+<td><code>title</code></td>
+</tr>
+<tr class="odd">
+<td><code>Year</code></td>
+<td><code>year</code></td>
+</tr>
+<tr class="even">
+<td><code>Source title</code></td>
+<td><code>journal</code></td>
+</tr>
+<tr class="odd">
+<td><code>DOI</code></td>
+<td><code>doi</code> (prefix stripped)</td>
+</tr>
+<tr class="even">
+<td><code>Cited by</code></td>
+<td><code>cited_by_count</code></td>
+</tr>
+<tr class="odd">
+<td><code>Abstract</code></td>
+<td><code>abstract</code></td>
+</tr>
+<tr class="even">
+<td><code>Document Type</code></td>
+<td><code>type</code></td>
+</tr>
+<tr class="odd">
+<td><code>Authors</code> (<code>;</code>-delimited)</td>
+<td><code>authors</code> (list)</td>
+</tr>
+<tr class="even">
+<td><code>References</code> (<code>;</code>-delimited)</td>
+<td><code>references</code> (list)</td>
+</tr>
+<tr class="odd">
+<td><code>Author Keywords</code> (<code>;</code>-delimited)</td>
+<td><code>keywords</code> (list)</td>
+</tr>
+<tr class="even">
+<td><code>Index Keywords</code> (<code>;</code>-delimited)</td>
+<td><code>index_keywords</code> (list, extra)</td>
+</tr>
+<tr class="odd">
+<td><code>Affiliations</code> (<code>;</code>-delimited)</td>
+<td><code>affiliations</code> (list, extra)</td>
+</tr>
+<tr class="even">
+<td><code>Language of Original Document</code></td>
+<td><code>language</code> (extra)</td>
+</tr>
+</tbody>
+</table>
+<p>Scopus stores each cited reference as one semicolon-delimited string
+in a single cell. <code>read_scopus()</code> splits on <code>;</code>
+and applies <code>standardize_refs()</code> to each entry: uppercasing,
+whitespace normalisation, and removal of a trailing DOI where present.
+References differing only in case or trailing DOI then resolve to the
+same node in co-citation and reference networks.</p>
+</div>
+<div id="web-of-science" class="section level2">
+<h2>5. Web of Science</h2>
+<p>WoS exports come in two shapes:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>wos1 <span class="ot">&lt;-</span> <span class="fu">read_wos</span>(<span class="st">&quot;savedrecs.txt&quot;</span>)                       <span class="co"># plaintext (default)</span></span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>wos2 <span class="ot">&lt;-</span> <span class="fu">read_wos</span>(<span class="st">&quot;savedrecs.tsv&quot;</span>, <span class="at">format =</span> <span class="st">&quot;tab&quot;</span>)       <span class="co"># tab-delimited</span></span></code></pre></div>
+<p>The plaintext format is a tagged record syntax. Each record begins
+with a <code>PT</code> (publication type) tag and ends with
+<code>ER</code> (end record). Within the record, every field is
+introduced by a 2-letter tag at the start of a line, with continuation
+lines indented:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Tag</th>
+<th>Field</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>AU</code></td>
+<td>Authors (one per line)</td>
+</tr>
+<tr class="even">
+<td><code>TI</code></td>
+<td>Title</td>
+</tr>
+<tr class="odd">
+<td><code>SO</code></td>
+<td>Source / journal</td>
+</tr>
+<tr class="even">
+<td><code>PY</code></td>
+<td>Year</td>
+</tr>
+<tr class="odd">
+<td><code>DI</code></td>
+<td>DOI</td>
+</tr>
+<tr class="even">
+<td><code>TC</code></td>
+<td>Times cited</td>
+</tr>
+<tr class="odd">
+<td><code>AB</code></td>
+<td>Abstract</td>
+</tr>
+<tr class="even">
+<td><code>DT</code></td>
+<td>Document type</td>
+</tr>
+<tr class="odd">
+<td><code>DE</code></td>
+<td>Author keywords</td>
+</tr>
+<tr class="even">
+<td><code>ID</code></td>
+<td>Keywords plus (extra: <code>keywords_plus</code>)</td>
+</tr>
+<tr class="odd">
+<td><code>CR</code></td>
+<td>Cited references (one per line)</td>
+</tr>
+</tbody>
+</table>
+<p><code>read_wos()</code> walks the file, splitting on <code>ER</code>
+boundaries, and emits one row per record. The tab-delimited variant
+carries the same fields in a flat CSV-like grid. Either way the output
+schema is identical.</p>
+</div>
+<div id="openalex-two-paths" class="section level2">
+<h2>6. OpenAlex — two paths</h2>
+<p>OpenAlex ships data through two routes that bibnets supports
+separately.</p>
+<div id="path-a-in-memory-tibble-from-openalexr" class="section level3">
+<h3>Path A: in-memory tibble from <code>openalexR</code></h3>
+<p>This path is used when references and abstracts are required.
+<code>openalexR::oa_fetch()</code> returns a nested tibble with
+<code>author</code>, <code>referenced_works</code>,
+<code>concepts</code>, and <code>keywords</code> list-columns;
+<code>read_openalex()</code> converts it to the standard schema:</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="fu">library</span>(openalexR)</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>raw  <span class="ot">&lt;-</span> <span class="fu">oa_fetch</span>(<span class="at">entity =</span> <span class="st">&quot;works&quot;</span>, <span class="at">search =</span> <span class="st">&quot;learning analytics&quot;</span>, <span class="at">per_page =</span> <span class="dv">200</span>)</span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>data <span class="ot">&lt;-</span> <span class="fu">read_openalex</span>(raw)</span></code></pre></div>
+<p>References are returned as OpenAlex Work IDs
+(e.g. <code>W2769342982</code>) rather than formatted citation strings.
+The IDs are stable identifiers suitable for co-citation and
+direct-citation networks; visualisations that need human-readable labels
+can join the IDs back to titles in a separate step.</p>
+</div>
+<div id="path-b-flat-csv" class="section level3">
+<h3>Path B: flat CSV</h3>
+<p>The <code>read_openalex_csv()</code> reader, demonstrated in section
+3, applies to the file format produced by the OpenAlex web interface.
+References and abstracts are not present in this format.</p>
+</div>
+</div>
+<div id="dimensions" class="section level2">
+<h2>7. Dimensions</h2>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>dm <span class="ot">&lt;-</span> <span class="fu">read_dimensions</span>(<span class="st">&quot;dimensions_export.csv&quot;</span>)</span></code></pre></div>
+<p>The Dimensions CSV begins with a metadata row of the form</p>
+<pre><code>&quot;About the data: This export was generated on YYYY-MM-DD ...&quot;</code></pre>
+<p>before the column header. <code>read_dimensions()</code> detects this
+preamble and skips it. If the line has been removed (for example, by
+manual editing of the file), the reader continues to function because it
+identifies the column row by the Dimensions header tokens
+<code>Publication ID</code> and <code>Dimensions URL</code>.</p>
+<p>Extras returned: <code>affiliations</code> and <code>countries</code>
+as list-columns, analogous to the OpenAlex schema.</p>
+</div>
+<div id="lens.org" class="section level2">
+<h2>8. Lens.org</h2>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>ln <span class="ot">&lt;-</span> <span class="fu">read_lens</span>(<span class="st">&quot;lens_export.csv&quot;</span>)</span></code></pre></div>
+<p>Key Lens columns and how they map:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Lens column</th>
+<th>Standard column</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>Lens ID</code></td>
+<td><code>id</code></td>
+</tr>
+<tr class="even">
+<td><code>Title</code></td>
+<td><code>title</code></td>
+</tr>
+<tr class="odd">
+<td><code>Publication Year</code></td>
+<td><code>year</code></td>
+</tr>
+<tr class="even">
+<td><code>Source Title</code></td>
+<td><code>journal</code></td>
+</tr>
+<tr class="odd">
+<td><code>DOI</code></td>
+<td><code>doi</code></td>
+</tr>
+<tr class="even">
+<td><code>Cited by Count</code></td>
+<td><code>cited_by_count</code></td>
+</tr>
+<tr class="odd">
+<td><code>Abstract</code></td>
+<td><code>abstract</code></td>
+</tr>
+<tr class="even">
+<td><code>Publication Type</code></td>
+<td><code>type</code></td>
+</tr>
+<tr class="odd">
+<td><code>Author/s</code></td>
+<td><code>authors</code> (list)</td>
+</tr>
+<tr class="even">
+<td><code>Reference Identifiers</code></td>
+<td><code>references</code> (list)</td>
+</tr>
+<tr class="odd">
+<td><code>Keywords</code></td>
+<td><code>keywords</code> (list)</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="bibtex-ris" class="section level2">
+<h2>9. BibTeX &amp; RIS</h2>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>bt <span class="ot">&lt;-</span> <span class="fu">read_bibtex</span>(<span class="st">&quot;library.bib&quot;</span>)</span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>ri <span class="ot">&lt;-</span> <span class="fu">read_ris</span>(<span class="st">&quot;savedrecs.ris&quot;</span>)</span></code></pre></div>
+<p><code>read_bibtex()</code> parses
+<code>@type{key, field = {value}, ...}</code> blocks.
+<code>read_ris()</code> parses tagged <code>TY  - ... ER  -</code>
+blocks; the structure is equivalent to WoS plaintext, but with a
+different tag dictionary.</p>
+<p>Standard BibTeX and RIS do not contain cited-reference data, so the
+<code>references</code> column in the resulting data frame is empty on
+every row. These formats are sufficient for co-authorship and keyword
+co-occurrence networks. For co-citation, coupling, or direct citation
+networks, the appropriate sources are Scopus, Web of Science, OpenAlex
+(via <code>oa_fetch()</code>), Dimensions, Lens, or Crossref.</p>
+</div>
+<div id="crossref-via-rcrossref" class="section level2">
+<h2>10. Crossref via rcrossref</h2>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="fu">library</span>(rcrossref)</span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>raw  <span class="ot">&lt;-</span> <span class="fu">cr_works</span>(<span class="at">query =</span> <span class="st">&quot;graph neural networks&quot;</span>, <span class="at">limit =</span> <span class="dv">100</span>)</span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a>data <span class="ot">&lt;-</span> <span class="fu">read_crossref</span>(raw<span class="sc">$</span>data)</span></code></pre></div>
+<p><code>read_crossref()</code> accepts the <code>data</code> element of
+the <code>cr_works()</code> result (a data frame, not the wrapping
+list). The function handles the two field-naming variants Crossref
+returns (<code>container.title</code> vs <code>container-title</code>;
+<code>is.referenced.by.count</code> vs
+<code>is-referenced-by-count</code>) and maps both to the standard
+schema.</p>
+</div>
+<div id="generic-csv-read_biblioformat-generic-..." class="section level2">
+<h2>11. Generic CSV —
+<code>read_biblio(format = &quot;generic&quot;, ...)</code></h2>
+<p>For CSV files that do not match any of the recognised signatures
+(in-house exports, custom dumps, public datasets), the generic path
+provides explicit column-name mapping. The identifier column is named
+via <code>id</code>; columns to be treated as list-columns are named via
+<code>actors</code>. <code>sep</code> is the delimiter applied inside
+those cells.</p>
+<p>Hypothetical call:</p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>data <span class="ot">&lt;-</span> <span class="fu">read_biblio</span>(</span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a>  <span class="st">&quot;my_data.csv&quot;</span>,</span>
+<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a>  <span class="at">format  =</span> <span class="st">&quot;generic&quot;</span>,</span>
+<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a>  <span class="at">id      =</span> <span class="st">&quot;doc_id&quot;</span>,</span>
+<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a>  <span class="at">actors  =</span> <span class="fu">c</span>(<span class="st">&quot;Authors&quot;</span>, <span class="st">&quot;Keywords&quot;</span>),</span>
+<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a>  <span class="at">sep     =</span> <span class="st">&quot;;&quot;</span></span>
+<span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a>)</span></code></pre></div>
+<p>Demonstrated on the bundled OpenAlex CSV (which uses <code>|</code>
+as the delimiter):</p>
+<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a>f <span class="ot">&lt;-</span> <span class="fu">system.file</span>(<span class="st">&quot;extdata&quot;</span>, <span class="st">&quot;openalex_works.csv&quot;</span>, <span class="at">package =</span> <span class="st">&quot;bibnets&quot;</span>)</span>
+<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a>generic <span class="ot">&lt;-</span> <span class="fu">read_biblio</span>(</span>
+<span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a>  f,</span>
+<span id="cb17-4"><a href="#cb17-4" tabindex="-1"></a>  <span class="at">format =</span> <span class="st">&quot;generic&quot;</span>,</span>
+<span id="cb17-5"><a href="#cb17-5" tabindex="-1"></a>  <span class="at">id     =</span> <span class="st">&quot;id&quot;</span>,</span>
+<span id="cb17-6"><a href="#cb17-6" tabindex="-1"></a>  <span class="at">actors =</span> <span class="fu">c</span>(<span class="st">&quot;authorships.author.display_name&quot;</span>, <span class="st">&quot;primary_topic.display_name&quot;</span>),</span>
+<span id="cb17-7"><a href="#cb17-7" tabindex="-1"></a>  <span class="at">sep    =</span> <span class="st">&quot;|&quot;</span></span>
+<span id="cb17-8"><a href="#cb17-8" tabindex="-1"></a>)</span>
+<span id="cb17-9"><a href="#cb17-9" tabindex="-1"></a><span class="fu">names</span>(generic)[<span class="dv">1</span><span class="sc">:</span><span class="dv">6</span>]</span>
+<span id="cb17-10"><a href="#cb17-10" tabindex="-1"></a><span class="co">#&gt; [1] &quot;id&quot;                              &quot;apc_list.value&quot;                 </span></span>
+<span id="cb17-11"><a href="#cb17-11" tabindex="-1"></a><span class="co">#&gt; [3] &quot;apc_paid.value&quot;                  &quot;authorships.author.display_name&quot;</span></span>
+<span id="cb17-12"><a href="#cb17-12" tabindex="-1"></a><span class="co">#&gt; [5] &quot;authorships.author.id&quot;           &quot;authorships.author.orcid&quot;</span></span>
+<span id="cb17-13"><a href="#cb17-13" tabindex="-1"></a>generic<span class="sc">$</span>authorships.author.display_name[[<span class="dv">1</span>]]</span>
+<span id="cb17-14"><a href="#cb17-14" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Jakub Kužílek&quot;  &quot;Martin Hlosta&quot;  &quot;Zdeněk Zdráhal&quot;</span></span></code></pre></div>
+<p>The named <code>id</code> column is copied to a top-level
+<code>id</code>. Each column listed in <code>actors</code> is split on
+<code>sep</code> and stored as a list-column. Other columns are retained
+unchanged. The resulting frame is therefore <em>not</em> in the standard
+schema; it is a wider source-specific table. Network constructors can
+either be pointed at the relevant columns directly, or the frame can be
+post-processed into the standard schema.</p>
+</div>
+<div id="building-data-manually" class="section level2">
+<h2>12. Building data manually</h2>
+<p>When data does not come from any of the supported sources, a
+bibnets-compatible data frame can be constructed directly. The
+requirement is: standard scalar columns are character or integer;
+multi-valued fields are list-columns whose elements are character
+vectors.</p>
+<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a>df <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a>  <span class="at">id    =</span> <span class="fu">c</span>(<span class="st">&quot;p1&quot;</span>, <span class="st">&quot;p2&quot;</span>, <span class="st">&quot;p3&quot;</span>),</span>
+<span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a>  <span class="at">title =</span> <span class="fu">c</span>(<span class="st">&quot;Paper A&quot;</span>, <span class="st">&quot;Paper B&quot;</span>, <span class="st">&quot;Paper C&quot;</span>),</span>
+<span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a>  <span class="at">year  =</span> <span class="fu">c</span>(<span class="dv">2020</span><span class="dt">L</span>, <span class="dv">2021</span><span class="dt">L</span>, <span class="dv">2022</span><span class="dt">L</span>),</span>
+<span id="cb18-5"><a href="#cb18-5" tabindex="-1"></a>  <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span></span>
+<span id="cb18-6"><a href="#cb18-6" tabindex="-1"></a>)</span>
+<span id="cb18-7"><a href="#cb18-7" tabindex="-1"></a>df<span class="sc">$</span>authors <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb18-8"><a href="#cb18-8" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;ALICE&quot;</span>, <span class="st">&quot;BOB&quot;</span>),</span>
+<span id="cb18-9"><a href="#cb18-9" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;BOB&quot;</span>, <span class="st">&quot;CAROL&quot;</span>),</span>
+<span id="cb18-10"><a href="#cb18-10" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;ALICE&quot;</span>, <span class="st">&quot;CAROL&quot;</span>, <span class="st">&quot;DAVE&quot;</span>)</span>
+<span id="cb18-11"><a href="#cb18-11" tabindex="-1"></a>)</span>
+<span id="cb18-12"><a href="#cb18-12" tabindex="-1"></a>df<span class="sc">$</span>references <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb18-13"><a href="#cb18-13" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;R1&quot;</span>, <span class="st">&quot;R2&quot;</span>),</span>
+<span id="cb18-14"><a href="#cb18-14" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;R1&quot;</span>, <span class="st">&quot;R3&quot;</span>),</span>
+<span id="cb18-15"><a href="#cb18-15" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;R2&quot;</span>, <span class="st">&quot;R3&quot;</span>, <span class="st">&quot;R4&quot;</span>)</span>
+<span id="cb18-16"><a href="#cb18-16" tabindex="-1"></a>)</span>
+<span id="cb18-17"><a href="#cb18-17" tabindex="-1"></a>df<span class="sc">$</span>keywords <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb18-18"><a href="#cb18-18" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;graph&quot;</span>, <span class="st">&quot;network&quot;</span>),</span>
+<span id="cb18-19"><a href="#cb18-19" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;network&quot;</span>, <span class="st">&quot;embedding&quot;</span>),</span>
+<span id="cb18-20"><a href="#cb18-20" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;graph&quot;</span>, <span class="st">&quot;embedding&quot;</span>, <span class="st">&quot;neural&quot;</span>)</span>
+<span id="cb18-21"><a href="#cb18-21" tabindex="-1"></a>)</span>
+<span id="cb18-22"><a href="#cb18-22" tabindex="-1"></a></span>
+<span id="cb18-23"><a href="#cb18-23" tabindex="-1"></a><span class="fu">author_network</span>(df, <span class="st">&quot;collaboration&quot;</span>)</span>
+<span id="cb18-24"><a href="#cb18-24" tabindex="-1"></a><span class="co">#&gt; # bibnets network: author_collaboration | 4 nodes · 5 edges | counting: full </span></span>
+<span id="cb18-25"><a href="#cb18-25" tabindex="-1"></a><span class="co">#&gt;    from   to     weight  count</span></span>
+<span id="cb18-26"><a href="#cb18-26" tabindex="-1"></a><span class="co">#&gt; 1  ALICE  BOB         1      1</span></span>
+<span id="cb18-27"><a href="#cb18-27" tabindex="-1"></a><span class="co">#&gt; 2  ALICE  CAROL       1      1</span></span>
+<span id="cb18-28"><a href="#cb18-28" tabindex="-1"></a><span class="co">#&gt; 3  BOB    CAROL       1      1</span></span>
+<span id="cb18-29"><a href="#cb18-29" tabindex="-1"></a><span class="co">#&gt; 4  ALICE  DAVE        1      1</span></span>
+<span id="cb18-30"><a href="#cb18-30" tabindex="-1"></a><span class="co">#&gt; 5  CAROL  DAVE        1      1</span></span>
+<span id="cb18-31"><a href="#cb18-31" tabindex="-1"></a><span class="fu">keyword_network</span>(df)</span>
+<span id="cb18-32"><a href="#cb18-32" tabindex="-1"></a><span class="co">#&gt; # bibnets network: keyword_co_occurrence | 4 nodes · 5 edges | counting: full </span></span>
+<span id="cb18-33"><a href="#cb18-33" tabindex="-1"></a><span class="co">#&gt;    from       to       weight  count</span></span>
+<span id="cb18-34"><a href="#cb18-34" tabindex="-1"></a><span class="co">#&gt; 1  EMBEDDING  GRAPH         1      1</span></span>
+<span id="cb18-35"><a href="#cb18-35" tabindex="-1"></a><span class="co">#&gt; 2  EMBEDDING  NETWORK       1      1</span></span>
+<span id="cb18-36"><a href="#cb18-36" tabindex="-1"></a><span class="co">#&gt; 3  GRAPH      NETWORK       1      1</span></span>
+<span id="cb18-37"><a href="#cb18-37" tabindex="-1"></a><span class="co">#&gt; 4  EMBEDDING  NEURAL        1      1</span></span>
+<span id="cb18-38"><a href="#cb18-38" tabindex="-1"></a><span class="co">#&gt; 5  GRAPH      NEURAL        1      1</span></span>
+<span id="cb18-39"><a href="#cb18-39" tabindex="-1"></a><span class="fu">reference_network</span>(df)</span>
+<span id="cb18-40"><a href="#cb18-40" tabindex="-1"></a><span class="co">#&gt; # bibnets network: reference_co_citation | 4 nodes · 5 edges | counting: full </span></span>
+<span id="cb18-41"><a href="#cb18-41" tabindex="-1"></a><span class="co">#&gt;    from  to  weight  count</span></span>
+<span id="cb18-42"><a href="#cb18-42" tabindex="-1"></a><span class="co">#&gt; 1  R1    R2       1      1</span></span>
+<span id="cb18-43"><a href="#cb18-43" tabindex="-1"></a><span class="co">#&gt; 2  R1    R3       1      1</span></span>
+<span id="cb18-44"><a href="#cb18-44" tabindex="-1"></a><span class="co">#&gt; 3  R2    R3       1      1</span></span>
+<span id="cb18-45"><a href="#cb18-45" tabindex="-1"></a><span class="co">#&gt; 4  R2    R4       1      1</span></span>
+<span id="cb18-46"><a href="#cb18-46" tabindex="-1"></a><span class="co">#&gt; 5  R3    R4       1      1</span></span></code></pre></div>
+<p><code>build_bipartite()</code> applies
+<code>toupper(trimws(...))</code> to every entity label before
+constructing the sparse matrix, so <code>&quot;graph&quot;</code>,
+<code>&quot;Graph&quot;</code>, and <code>&quot;GRAPH&quot;</code> are mapped to the same
+node <code>&quot;GRAPH&quot;</code>. Tests or comparisons that reference node
+names should use uppercase strings.</p>
+</div>
+<div id="the-split_field-helper" class="section level2">
+<h2>13. The <code>split_field()</code> helper</h2>
+<p><code>split_field()</code> converts a character column with
+semicolon-delimited (or otherwise delimited) values into a list-column
+without going through <code>read_biblio(format = &quot;generic&quot;)</code>:</p>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a><span class="fu">split_field</span>(<span class="fu">c</span>(<span class="st">&quot;Alice; Bob; Carol&quot;</span>, <span class="st">&quot;Dave; Eve&quot;</span>))</span>
+<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a><span class="co">#&gt; [[1]]</span></span>
+<span id="cb19-3"><a href="#cb19-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Alice&quot; &quot;Bob&quot;   &quot;Carol&quot;</span></span>
+<span id="cb19-4"><a href="#cb19-4" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb19-5"><a href="#cb19-5" tabindex="-1"></a><span class="co">#&gt; [[2]]</span></span>
+<span id="cb19-6"><a href="#cb19-6" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Dave&quot; &quot;Eve&quot;</span></span>
+<span id="cb19-7"><a href="#cb19-7" tabindex="-1"></a><span class="fu">split_field</span>(<span class="fu">c</span>(<span class="st">&quot;a|b|c&quot;</span>, <span class="st">&quot;d|e&quot;</span>), <span class="at">sep =</span> <span class="st">&quot;|&quot;</span>)</span>
+<span id="cb19-8"><a href="#cb19-8" tabindex="-1"></a><span class="co">#&gt; [[1]]</span></span>
+<span id="cb19-9"><a href="#cb19-9" tabindex="-1"></a><span class="co">#&gt; [1] &quot;a&quot; &quot;b&quot; &quot;c&quot;</span></span>
+<span id="cb19-10"><a href="#cb19-10" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb19-11"><a href="#cb19-11" tabindex="-1"></a><span class="co">#&gt; [[2]]</span></span>
+<span id="cb19-12"><a href="#cb19-12" tabindex="-1"></a><span class="co">#&gt; [1] &quot;d&quot; &quot;e&quot;</span></span></code></pre></div>
+<p>This is the same operation that <code>read_scopus()</code> and the
+other readers apply internally to multi-valued columns; it is exported
+for use in custom pipelines.</p>
+</div>
+<div id="combining-data-from-multiple-sources" class="section level2">
+<h2>14. Combining data from multiple sources</h2>
+<p>Different readers expose different extras: WoS provides
+<code>keywords_plus</code>, Scopus provides <code>index_keywords</code>,
+OpenAlex provides <code>countries</code>. To combine sources, restrict
+each frame to the standard columns and bind:</p>
+<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a>common <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;id&quot;</span>, <span class="st">&quot;title&quot;</span>, <span class="st">&quot;year&quot;</span>, <span class="st">&quot;journal&quot;</span>, <span class="st">&quot;doi&quot;</span>, <span class="st">&quot;cited_by_count&quot;</span>,</span>
+<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a>            <span class="st">&quot;abstract&quot;</span>, <span class="st">&quot;type&quot;</span>, <span class="st">&quot;authors&quot;</span>, <span class="st">&quot;references&quot;</span>, <span class="st">&quot;keywords&quot;</span>)</span>
+<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a></span>
+<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a><span class="fu">data</span>(biblio_data)</span>
+<span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a>b1 <span class="ot">&lt;-</span> biblio_data</span>
+<span id="cb20-6"><a href="#cb20-6" tabindex="-1"></a>b2 <span class="ot">&lt;-</span> biblio_data</span>
+<span id="cb20-7"><a href="#cb20-7" tabindex="-1"></a>b2<span class="sc">$</span>id <span class="ot">&lt;-</span> <span class="fu">paste0</span>(b2<span class="sc">$</span>id, <span class="st">&quot;_dup&quot;</span>)</span>
+<span id="cb20-8"><a href="#cb20-8" tabindex="-1"></a></span>
+<span id="cb20-9"><a href="#cb20-9" tabindex="-1"></a>cols <span class="ot">&lt;-</span> <span class="fu">intersect</span>(common, <span class="fu">names</span>(b1))</span>
+<span id="cb20-10"><a href="#cb20-10" tabindex="-1"></a>combined <span class="ot">&lt;-</span> <span class="fu">rbind</span>(b1[, cols], b2[, cols])</span>
+<span id="cb20-11"><a href="#cb20-11" tabindex="-1"></a><span class="fu">nrow</span>(combined)</span>
+<span id="cb20-12"><a href="#cb20-12" tabindex="-1"></a><span class="co">#&gt; [1] 20</span></span></code></pre></div>
+<p>Two practical notes:</p>
+<ol style="list-style-type: decimal">
+<li>When document IDs overlap across sources (which occurs when Scopus
+and WoS both index the same article), prefixing the IDs as shown
+prevents duplicate documents from inflating co-occurrence counts.</li>
+<li>Source-specific extras (e.g. WoS <code>keywords_plus</code>) should
+be retained on the per-source frame and merged selectively rather than
+coerced into the combined frame.</li>
+</ol>
+</div>
+<div id="inspecting-and-sanity-checking" class="section level2">
+<h2>15. Inspecting and sanity-checking</h2>
+<p>After reading, basic checks on the list-column sizes and the scalar
+columns help detect silent corruption. Empty list-columns and
+out-of-range years are common indicators that an export is
+incomplete.</p>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a><span class="fu">data</span>(scopus_quantum_cloud)</span>
+<span id="cb21-2"><a href="#cb21-2" tabindex="-1"></a>sc <span class="ot">&lt;-</span> scopus_quantum_cloud</span>
+<span id="cb21-3"><a href="#cb21-3" tabindex="-1"></a></span>
+<span id="cb21-4"><a href="#cb21-4" tabindex="-1"></a><span class="fu">range</span>(<span class="fu">lengths</span>(sc<span class="sc">$</span>authors))</span>
+<span id="cb21-5"><a href="#cb21-5" tabindex="-1"></a><span class="co">#&gt; [1]  0 40</span></span>
+<span id="cb21-6"><a href="#cb21-6" tabindex="-1"></a><span class="fu">range</span>(<span class="fu">lengths</span>(sc<span class="sc">$</span>references))</span>
+<span id="cb21-7"><a href="#cb21-7" tabindex="-1"></a><span class="co">#&gt; [1]   0 245</span></span>
+<span id="cb21-8"><a href="#cb21-8" tabindex="-1"></a><span class="fu">range</span>(<span class="fu">lengths</span>(sc<span class="sc">$</span>keywords))</span>
+<span id="cb21-9"><a href="#cb21-9" tabindex="-1"></a><span class="co">#&gt; [1]  0 20</span></span>
+<span id="cb21-10"><a href="#cb21-10" tabindex="-1"></a></span>
+<span id="cb21-11"><a href="#cb21-11" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">sort</span>(<span class="fu">table</span>(sc<span class="sc">$</span>journal), <span class="at">decreasing =</span> <span class="cn">TRUE</span>), <span class="dv">5</span>)</span>
+<span id="cb21-12"><a href="#cb21-12" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb21-13"><a href="#cb21-13" tabindex="-1"></a><span class="co">#&gt; IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems </span></span>
+<span id="cb21-14"><a href="#cb21-14" tabindex="-1"></a><span class="co">#&gt;                                                                            24 </span></span>
+<span id="cb21-15"><a href="#cb21-15" tabindex="-1"></a><span class="co">#&gt;                   IEEE Transactions on Circuits and Systems I: Regular Papers </span></span>
+<span id="cb21-16"><a href="#cb21-16" tabindex="-1"></a><span class="co">#&gt;                                                                            20 </span></span>
+<span id="cb21-17"><a href="#cb21-17" tabindex="-1"></a><span class="co">#&gt;                                                                   IEEE Access </span></span>
+<span id="cb21-18"><a href="#cb21-18" tabindex="-1"></a><span class="co">#&gt;                                                                            18 </span></span>
+<span id="cb21-19"><a href="#cb21-19" tabindex="-1"></a><span class="co">#&gt;              IEEE Transactions on Very Large Scale Integration (VLSI) Systems </span></span>
+<span id="cb21-20"><a href="#cb21-20" tabindex="-1"></a><span class="co">#&gt;                                                                            14 </span></span>
+<span id="cb21-21"><a href="#cb21-21" tabindex="-1"></a><span class="co">#&gt;                                               IEEE Internet of Things Journal </span></span>
+<span id="cb21-22"><a href="#cb21-22" tabindex="-1"></a><span class="co">#&gt;                                                                            12</span></span>
+<span id="cb21-23"><a href="#cb21-23" tabindex="-1"></a><span class="fu">range</span>(sc<span class="sc">$</span>year, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb21-24"><a href="#cb21-24" tabindex="-1"></a><span class="co">#&gt; [1] 2020 2025</span></span>
+<span id="cb21-25"><a href="#cb21-25" tabindex="-1"></a><span class="fu">table</span>(sc<span class="sc">$</span>type)</span>
+<span id="cb21-26"><a href="#cb21-26" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb21-27"><a href="#cb21-27" tabindex="-1"></a><span class="co">#&gt;           Article              Book      Book chapter  Conference paper </span></span>
+<span id="cb21-28"><a href="#cb21-28" tabindex="-1"></a><span class="co">#&gt;               279                 1                15               191 </span></span>
+<span id="cb21-29"><a href="#cb21-29" tabindex="-1"></a><span class="co">#&gt; Conference review            Review </span></span>
+<span id="cb21-30"><a href="#cb21-30" tabindex="-1"></a><span class="co">#&gt;                 3                10</span></span></code></pre></div>
+<p>Indicators to check:</p>
+<ul>
+<li>A <code>lengths()</code> of <code>0</code> on every row of
+<code>references</code> for a Scopus or WoS file indicates that the
+export did not include the references column. Re-export from the source
+with the references field selected.</li>
+<li>A year of <code>0</code> or <code>NA</code> indicates an empty
+source field.</li>
+<li>A single dominant document type (e.g. only <code>&quot;article&quot;</code>)
+is expected for filtered searches; broader mixes are expected for
+thematic searches.</li>
+</ul>
+</div>
+<div id="troubleshooting" class="section level2">
+<h2>16. Troubleshooting</h2>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Symptom</th>
+<th>Cause</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>Could not detect file format</code></td>
+<td>First line doesn’t match any signature</td>
+<td>Pass <code>format = &quot;scopus&quot;</code> (etc.) explicitly, or use
+<code>format = &quot;generic&quot;</code> with <code>actors</code></td>
+</tr>
+<tr class="even">
+<td>Empty <code>references</code> list on every row</td>
+<td>BibTeX/RIS or OpenAlex flat CSV — these don’t carry citations</td>
+<td>Use Scopus/WoS, OpenAlex via <code>oa_fetch()</code>, Dimensions,
+Lens, or Crossref</td>
+</tr>
+<tr class="odd">
+<td><code>Invalid multibyte string</code> on read</td>
+<td>Wrong encoding</td>
+<td>Most readers accept <code>encoding = &quot;latin1&quot;</code>; pass it
+through <code>read_biblio(..., encoding = &quot;latin1&quot;)</code></td>
+</tr>
+<tr class="even">
+<td>Author names look like <code>LASTNAME, F.J.</code> not
+<code>FJ LASTNAME</code></td>
+<td>Default is <code>flip_names = FALSE</code></td>
+<td>The reader returns names as-is from the source. Cluster them by
+string match downstream, or pass <code>flip_names = TRUE</code> if all
+names follow <code>Last, First</code></td>
+</tr>
+<tr class="odd">
+<td>Dimensions file silently fails</td>
+<td>“About the data” preamble removed and column header edited</td>
+<td><code>read_dimensions()</code> detects the standard preamble and
+falls back to header-token detection; the failure mode requires the
+column header itself to have been edited</td>
+</tr>
+<tr class="even">
+<td>Co-authorship network contains duplicate nodes
+(e.g. <code>&quot;Alice&quot;</code> and <code>&quot;ALICE&quot;</code>)</td>
+<td>Mixed casing in the source</td>
+<td>The standard readers and <code>build_bipartite()</code> apply
+<code>toupper(trimws(...))</code> to entity labels. Manually constructed
+frames should apply the same normalisation</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="further-reading" class="section level2">
+<h2>Further reading</h2>
+<ul>
+<li>The companion vignette, <code>vignette(&quot;bibnets&quot;)</code>, covers
+network construction on the in-package datasets.</li>
+<li>All network builders (<code>author_network()</code>,
+<code>keyword_network()</code>, <code>reference_network()</code>,
+<code>document_network()</code>, <code>source_network()</code>,
+<code>country_network()</code>, <code>institution_network()</code>,
+<code>conetwork()</code>) accept the same set of arguments
+(<code>type</code>, <code>counting</code>, <code>similarity</code>,
+<code>threshold</code>, <code>top_n</code>, <code>format</code>), so
+switching between network types on data already in the standard schema
+requires only a function-name change.</li>
+</ul>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

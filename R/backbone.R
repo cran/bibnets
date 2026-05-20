@@ -1,0 +1,67 @@
+#' Extract network backbone using the disparity filter
+#'
+#' Applies the disparity filter to a weighted edge list. For each edge, it
+#' computes an alpha (p-value) from both endpoints and keeps the edge if it
+#' is statistically significant from at least one endpoint.
+#'
+#' The null model asks: given that node \eqn{i} has total strength \eqn{s_i}
+#' distributed uniformly across \eqn{k_i} edges, what is the probability that
+#' a single edge weight is as large as \eqn{w_{ij}}? The answer is
+#' \deqn{\alpha_{ij} = \left(1 - \frac{w_{ij}}{s_i}\right)^{k_i - 1}}
+#'
+#' An edge is retained if \eqn{\min(\alpha_{ij}, \alpha_{ji}) < \alpha}.
+#' Nodes with only one edge always have \eqn{\alpha = 0} and are always kept.
+#'
+#' @param edges A data frame with at least columns `from`, `to`, and `weight`.
+#'   Must be an undirected edge list (each pair appears once).
+#' @param alpha Numeric. Significance threshold in (0, 1). Default `0.05`.
+#'
+#' @return The filtered edge data frame with an added `alpha` column (the
+#'   minimum alpha from the two endpoints).
+#'
+#' @export
+#' @examples
+#' edges <- data.frame(
+#'   from   = c("A", "A", "A", "B", "C"),
+#'   to     = c("B", "C", "D", "C", "D"),
+#'   weight = c(10,   1,   1,   8,   1)
+#' )
+#' backbone(edges, alpha = 0.05)
+backbone <- function(edges, alpha = 0.05) {
+  check_edges(edges)
+  if (!is.numeric(alpha) || length(alpha) != 1L || alpha <= 0 || alpha >= 1)
+    stop("'alpha' must be a single number between 0 and 1 (exclusive), got: ",
+         alpha, call. = FALSE)
+
+  if (nrow(edges) == 0L) {
+    edges$alpha <- numeric(0)
+    return(edges)
+  }
+
+  ## Strength and degree per node in one O(m) pass: double the edge list
+  ## so every node appears once as "from", then tapply aggregates.
+  node_both   <- c(edges$from, edges$to)
+  weight_both <- c(edges$weight, edges$weight)
+  strength <- tapply(weight_both, node_both, sum)
+  degree   <- tapply(rep(1L, length(node_both)), node_both, sum)
+
+  ## Alpha from node i for edge (i,j): (1 - w/s_i)^(k_i - 1)
+  ## Nodes with degree 1 always get alpha = 0 (always kept)
+  compute_alpha <- function(node, w) {
+    s <- strength[node]
+    k <- degree[node]
+    if (k <= 1L || s == 0) return(0)
+    (1 - w / s) ^ (k - 1L)
+  }
+
+  edge_alpha <- pmin(
+    mapply(compute_alpha, edges$from, edges$weight),
+    mapply(compute_alpha, edges$to,   edges$weight)
+  )
+
+  edges$alpha <- edge_alpha
+  result <- edges[edge_alpha < alpha, ]
+  result <- result[order(-result$weight), ]
+  rownames(result) <- NULL
+  result
+}
