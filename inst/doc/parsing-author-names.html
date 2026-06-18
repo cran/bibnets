@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Parsing and normalising author names</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Parsing and normalising author names</h1>
+
+
+
+<div id="what-parse_names-is" class="section level2">
+<h2>What <code>parse_names()</code> is</h2>
+<p><code>parse_names()</code> is an <strong>optional, standalone
+utility</strong> for cleaning author name strings. It does two
+things:</p>
+<ol style="list-style-type: decimal">
+<li>Reorders names to <code>&quot;First Last&quot;</code> (or other styles).</li>
+<li>Breaks each name into components (<code>first</code>,
+<code>last</code>, <code>particle</code>, <code>suffix</code>), returned
+as the <code>&quot;parts&quot;</code> attribute.</li>
+</ol>
+<p>It is <strong>not</strong> called by any reader or network builder.
+bibnets matches entity labels verbatim; you opt in to normalisation by
+calling this function yourself.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">parse_names</span>(<span class="fu">c</span>(<span class="st">&quot;Saqr, Mohammed&quot;</span>, <span class="st">&quot;Lopez-Pernas, Sonsoles&quot;</span>))</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Mohammed Saqr&quot;         &quot;Sonsoles Lopez-Pernas&quot;</span></span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;parts&quot;)</span></span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a><span class="co">#&gt;                 original    first         last particle suffix   type</span></span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="co">#&gt; 1         Saqr, Mohammed Mohammed         Saqr     &lt;NA&gt;   &lt;NA&gt; person</span></span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="co">#&gt; 2 Lopez-Pernas, Sonsoles Sonsoles Lopez-Pernas     &lt;NA&gt;   &lt;NA&gt; person</span></span></code></pre></div>
+</div>
+<div id="the-three-name-conventions" class="section level2">
+<h2>The three name conventions</h2>
+<p>Bibliometric exports use three incompatible conventions.
+<code>parse_names()</code> recognises all three; the rule is decided per
+string.</p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Input</th>
+<th>Convention</th>
+<th>Detected by</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>&quot;Saqr, Mohammed&quot;</code></td>
+<td><code>Last, First</code></td>
+<td>the comma</td>
+</tr>
+<tr class="even">
+<td><code>&quot;WANG Y&quot;</code></td>
+<td><code>SURNAME Initials</code> (Scopus/bibnets)</td>
+<td>trailing uppercase 1–3 letter token</td>
+</tr>
+<tr class="odd">
+<td><code>&quot;Mohammed Saqr&quot;</code></td>
+<td><code>First Last</code></td>
+<td>default for comma-less, non-initial</td>
+</tr>
+</tbody>
+</table>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">parse_names</span>(<span class="fu">c</span>(<span class="st">&quot;Saqr, Mohammed&quot;</span>, <span class="st">&quot;WANG Y&quot;</span>, <span class="st">&quot;Mohammed Saqr&quot;</span>))</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Mohammed Saqr&quot; &quot;Y WANG&quot;        &quot;Mohammed Saqr&quot;</span></span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;parts&quot;)</span></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co">#&gt;         original    first last particle suffix   type</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="co">#&gt; 1 Saqr, Mohammed Mohammed Saqr     &lt;NA&gt;   &lt;NA&gt; person</span></span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="co">#&gt; 2         WANG Y        Y WANG     &lt;NA&gt;   &lt;NA&gt; person</span></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co">#&gt; 3  Mohammed Saqr Mohammed Saqr     &lt;NA&gt;   &lt;NA&gt; person</span></span></code></pre></div>
+<p>A comma always means <code>Last, First</code>. For comma-less strings
+the <code>surname_first</code> argument controls interpretation:</p>
+<ul>
+<li><code>&quot;auto&quot;</code> (default) — surname-first <strong>iff</strong>
+the trailing token looks like initials (all-uppercase, 1–3 letters).
+This is the <em>bibnets-takes-precedence</em> bias: native
+bibnets/Scopus labels parse correctly with no extra arguments, and
+ordinary mixed-case <code>&quot;First Last&quot;</code> is never misread.</li>
+<li><code>&quot;yes&quot;</code> / <code>TRUE</code> — force surname-first.</li>
+<li><code>&quot;no&quot;</code> / <code>FALSE</code> — force given-first
+(comma-less returned unchanged).</li>
+</ul>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">parse_names</span>(<span class="st">&quot;Wang Yong&quot;</span>, <span class="at">surname_first =</span> <span class="st">&quot;yes&quot;</span>)   <span class="co"># force surname-first</span></span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Yong Wang&quot;</span></span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;parts&quot;)</span></span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a><span class="co">#&gt;    original first last particle suffix   type</span></span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="co">#&gt; 1 Wang Yong  Yong Wang     &lt;NA&gt;   &lt;NA&gt; person</span></span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a><span class="fu">parse_names</span>(<span class="st">&quot;WANG Y&quot;</span>,    <span class="at">surname_first =</span> <span class="st">&quot;no&quot;</span>)    <span class="co"># force given-first</span></span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a><span class="co">#&gt; [1] &quot;WANG Y&quot;</span></span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;parts&quot;)</span></span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a><span class="co">#&gt;   original first last particle suffix   type</span></span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a><span class="co">#&gt; 1   WANG Y  WANG    Y     &lt;NA&gt;   &lt;NA&gt; person</span></span></code></pre></div>
+<p>Particles and suffixes are handled, and detection is case-insensitive
+so it works on bibnets’ upper-cased labels:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">parse_names</span>(<span class="fu">c</span>(<span class="st">&quot;van der Berg, Jan&quot;</span>, <span class="st">&quot;Smith, John, Jr.&quot;</span>,</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>              <span class="st">&quot;DE LA CRUZ, ANA&quot;</span>, <span class="st">&quot;VAN DER BERG J&quot;</span>))</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Jan van der Berg&quot; &quot;John Smith Jr&quot;    &quot;ANA DE LA CRUZ&quot;   &quot;J VAN DER BERG&quot;  </span></span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;parts&quot;)</span></span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="co">#&gt;            original first  last particle suffix   type</span></span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="co">#&gt; 1 van der Berg, Jan   Jan  Berg  van der   &lt;NA&gt; person</span></span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="co">#&gt; 2  Smith, John, Jr.  John Smith     &lt;NA&gt;     Jr person</span></span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a><span class="co">#&gt; 3   DE LA CRUZ, ANA   ANA  CRUZ    DE LA   &lt;NA&gt; person</span></span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a><span class="co">#&gt; 4    VAN DER BERG J     J  BERG  VAN DER   &lt;NA&gt; person</span></span></code></pre></div>
+<p>Group / corporate authors, <code>NA</code>, and empty strings are
+left untouched:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">parse_names</span>(<span class="fu">c</span>(<span class="st">&quot;WHO Collaborating Group&quot;</span>, <span class="cn">NA</span>, <span class="st">&quot;&quot;</span>))</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;WHO Collaborating Group&quot; NA                       </span></span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="co">#&gt; [3] &quot;&quot;                       </span></span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;parts&quot;)</span></span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="co">#&gt;                  original first last particle suffix         type</span></span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="co">#&gt; 1 WHO Collaborating Group  &lt;NA&gt; &lt;NA&gt;     &lt;NA&gt;   &lt;NA&gt; organization</span></span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="co">#&gt; 2                    &lt;NA&gt;  &lt;NA&gt; &lt;NA&gt;     &lt;NA&gt;   &lt;NA&gt;      missing</span></span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a><span class="co">#&gt; 3                          &lt;NA&gt; &lt;NA&gt;     &lt;NA&gt;   &lt;NA&gt;        empty</span></span></code></pre></div>
+</div>
+<div id="output-styles-format" class="section level2">
+<h2>Output styles: <code>format</code></h2>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>nm <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;Saqr, Mohammed&quot;</span>, <span class="st">&quot;van der Berg, Jan&quot;</span>, <span class="st">&quot;Garcia Marquez, Gabriel Jose&quot;</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="fu">data.frame</span>(</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="at">first_last    =</span> <span class="fu">parse_names</span>(nm),</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="at">last_initials =</span> <span class="fu">parse_names</span>(nm, <span class="at">format =</span> <span class="st">&quot;last_initials&quot;</span>),</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  <span class="at">last          =</span> <span class="fu">parse_names</span>(nm, <span class="at">format =</span> <span class="st">&quot;last&quot;</span>)</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>)</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a><span class="co">#&gt;                    first_last       last_initials           last</span></span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a><span class="co">#&gt; 1               Mohammed Saqr             Saqr M.           Saqr</span></span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a><span class="co">#&gt; 2            Jan van der Berg     van der Berg J.   van der Berg</span></span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a><span class="co">#&gt; 3 Gabriel Jose Garcia Marquez Garcia Marquez G.J. Garcia Marquez</span></span></code></pre></div>
+</div>
+<div id="the-parts-attribute" class="section level2">
+<h2>The <code>&quot;parts&quot;</code> attribute</h2>
+<p>The parsed components ride along on every call, independent of
+<code>format</code>:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>x <span class="ot">&lt;-</span> <span class="fu">parse_names</span>(<span class="fu">c</span>(<span class="st">&quot;van der Berg, Jan&quot;</span>, <span class="st">&quot;Smith, John, Jr.&quot;</span>))</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="fu">attr</span>(x, <span class="st">&quot;parts&quot;</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="co">#&gt;            original first  last particle suffix   type</span></span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="co">#&gt; 1 van der Berg, Jan   Jan  Berg  van der   &lt;NA&gt; person</span></span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="co">#&gt; 2  Smith, John, Jr.  John Smith     &lt;NA&gt;     Jr person</span></span></code></pre></div>
+<p><code>type</code> is one of <code>&quot;person&quot;</code>,
+<code>&quot;organization&quot;</code>, <code>&quot;empty&quot;</code>,
+<code>&quot;missing&quot;</code>.</p>
+</div>
+<div id="input-shape-vector-not-data-frame" class="section level2">
+<h2>Input shape: vector, not data frame</h2>
+<p><code>parse_names()</code> works on <strong>one flat character
+vector</strong>. It is not a data-frame function.</p>
+<p>bibnets readers store authors as a <strong>list-column</strong>: each
+paper has a variable number of authors, so the cell holds a
+<em>vector</em>, not a single string.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>papers <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">id =</span> <span class="fu">c</span>(<span class="st">&quot;P1&quot;</span>, <span class="st">&quot;P2&quot;</span>, <span class="st">&quot;P3&quot;</span>), <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>papers<span class="sc">$</span>authors <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;Saqr, Mohammed&quot;</span>, <span class="st">&quot;Lopez, Ana&quot;</span>),</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;SAQR M&quot;</span>,         <span class="st">&quot;Lopez, Ana&quot;</span>),</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;Saqr, Mohammed&quot;</span>, <span class="st">&quot;Chen, Wei&quot;</span>))</span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>papers<span class="sc">$</span>authors</span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a><span class="co">#&gt; [[1]]</span></span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Saqr, Mohammed&quot; &quot;Lopez, Ana&quot;    </span></span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a><span class="co">#&gt; [[2]]</span></span>
+<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a><span class="co">#&gt; [1] &quot;SAQR M&quot;     &quot;Lopez, Ana&quot;</span></span>
+<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a><span class="co">#&gt; [[3]]</span></span>
+<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Saqr, Mohammed&quot; &quot;Chen, Wei&quot;</span></span></code></pre></div>
+<p>Map the function over the list-column with <code>lapply()</code>:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>papers<span class="sc">$</span>authors <span class="ot">&lt;-</span> <span class="fu">lapply</span>(papers<span class="sc">$</span>authors, parse_names,</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>                          <span class="at">format =</span> <span class="st">&quot;last_initials&quot;</span>)</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>papers<span class="sc">$</span>authors</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a><span class="co">#&gt; [[1]]</span></span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Saqr M.&quot;  &quot;Lopez A.&quot;</span></span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;parts&quot;)</span></span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a><span class="co">#&gt;         original    first  last particle suffix   type</span></span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a><span class="co">#&gt; 1 Saqr, Mohammed Mohammed  Saqr     &lt;NA&gt;   &lt;NA&gt; person</span></span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a><span class="co">#&gt; 2     Lopez, Ana      Ana Lopez     &lt;NA&gt;   &lt;NA&gt; person</span></span>
+<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a><span class="co">#&gt; [[2]]</span></span>
+<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a><span class="co">#&gt; [1] &quot;SAQR M.&quot;  &quot;Lopez A.&quot;</span></span>
+<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;parts&quot;)</span></span>
+<span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a><span class="co">#&gt;     original first  last particle suffix   type</span></span>
+<span id="cb9-15"><a href="#cb9-15" tabindex="-1"></a><span class="co">#&gt; 1     SAQR M     M  SAQR     &lt;NA&gt;   &lt;NA&gt; person</span></span>
+<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a><span class="co">#&gt; 2 Lopez, Ana   Ana Lopez     &lt;NA&gt;   &lt;NA&gt; person</span></span>
+<span id="cb9-17"><a href="#cb9-17" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb9-18"><a href="#cb9-18" tabindex="-1"></a><span class="co">#&gt; [[3]]</span></span>
+<span id="cb9-19"><a href="#cb9-19" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Saqr M.&quot; &quot;Chen W.&quot;</span></span>
+<span id="cb9-20"><a href="#cb9-20" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;parts&quot;)</span></span>
+<span id="cb9-21"><a href="#cb9-21" tabindex="-1"></a><span class="co">#&gt;         original    first last particle suffix   type</span></span>
+<span id="cb9-22"><a href="#cb9-22" tabindex="-1"></a><span class="co">#&gt; 1 Saqr, Mohammed Mohammed Saqr     &lt;NA&gt;   &lt;NA&gt; person</span></span>
+<span id="cb9-23"><a href="#cb9-23" tabindex="-1"></a><span class="co">#&gt; 2      Chen, Wei      Wei Chen     &lt;NA&gt;   &lt;NA&gt; person</span></span></code></pre></div>
+<p>A flat character column (or a network’s <code>from</code> /
+<code>to</code>) is called directly, no <code>lapply()</code>:</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="fu">parse_names</span>(<span class="fu">c</span>(<span class="st">&quot;WANG Y&quot;</span>, <span class="st">&quot;AYALA-ROMERO JA&quot;</span>))</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Y WANG&quot;          &quot;JA AYALA-ROMERO&quot;</span></span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;parts&quot;)</span></span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="co">#&gt;          original first         last particle suffix   type</span></span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a><span class="co">#&gt; 1          WANG Y     Y         WANG     &lt;NA&gt;   &lt;NA&gt; person</span></span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a><span class="co">#&gt; 2 AYALA-ROMERO JA   J A AYALA-ROMERO     &lt;NA&gt;   &lt;NA&gt; person</span></span></code></pre></div>
+</div>
+<div id="recommended-workflow-normalise-before-building" class="section level2">
+<h2>Recommended workflow: normalise <em>before</em> building</h2>
+<p>Node identity in bibnets is fixed when the network is built (labels
+are upper-cased and matched verbatim). Two spellings of one author merge
+into a single node <strong>only if normalised before</strong>
+<code>author_network()</code>.</p>
+<p>Here <code>&quot;Saqr, Mohammed&quot;</code> and <code>&quot;SAQR M&quot;</code> are the
+same person written two ways. After normalising they both become
+<code>SAQR M.</code>, so the Saqr–Lopez collaboration is correctly
+counted as <strong>2</strong>:</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>net <span class="ot">&lt;-</span> <span class="fu">author_network</span>(papers, <span class="at">type =</span> <span class="st">&quot;collaboration&quot;</span>)</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>net</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a><span class="co">#&gt; # bibnets network: author_collaboration | 3 nodes · 2 edges | counting: full </span></span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a><span class="co">#&gt;    from      to       weight  count</span></span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a><span class="co">#&gt; 1  LOPEZ A.  SAQR M.       2      2</span></span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a><span class="co">#&gt; 2  CHEN W.   SAQR M.       1      1</span></span></code></pre></div>
+<p>Had we built the network first and called <code>parse_names()</code>
+on <code>from</code> / <code>to</code> afterwards, the two spellings
+would already have been counted as two separate nodes — too late to
+merge by relabelling.</p>
+</div>
+<div id="applying-to-an-existing-edgelist-and-its-hazards" class="section level2">
+<h2>Applying to an existing edgelist (and its hazards)</h2>
+<p>The network object is a data frame (<code>from</code>,
+<code>to</code>, <code>weight</code>, <code>count</code>) with an extra
+<code>bibnets_network</code> class for printing:</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="fu">class</span>(net)</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;bibnets_network&quot; &quot;data.frame&quot;</span></span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a><span class="fu">is.data.frame</span>(net)</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
+<p>You <em>can</em> relabel <code>from</code> / <code>to</code>
+directly, but <code>parse_names()</code> is graph-blind. Edges, pairing,
+<code>weight</code> and <code>count</code> are preserved, but:</p>
+<ul>
+<li>Apply the <strong>same call to both</strong> endpoint columns, or
+the two ends use different labels.</li>
+<li>The mapping is <strong>many-to-one</strong>: distinct authors can
+collapse onto one label (especially <code>&quot;last_initials&quot;</code>), and
+bibnets does <strong>not</strong> re-aggregate the resulting duplicate
+edges.</li>
+</ul>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>net<span class="sc">$</span>from <span class="ot">&lt;-</span> <span class="fu">as.vector</span>(<span class="fu">parse_names</span>(net<span class="sc">$</span>from, <span class="at">format =</span> <span class="st">&quot;last&quot;</span>))</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>net<span class="sc">$</span>to   <span class="ot">&lt;-</span> <span class="fu">as.vector</span>(<span class="fu">parse_names</span>(net<span class="sc">$</span>to,   <span class="at">format =</span> <span class="st">&quot;last&quot;</span>))</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>net</span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a><span class="co">#&gt; # bibnets network: author_collaboration | 3 nodes · 2 edges | counting: full </span></span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a><span class="co">#&gt;    from   to    weight  count</span></span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a><span class="co">#&gt; 1  LOPEZ  SAQR       2      2</span></span>
+<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a><span class="co">#&gt; 2  CHEN   SAQR       1      1</span></span></code></pre></div>
+<p>Use <code>as.vector()</code> when assigning back so the
+<code>&quot;parts&quot;</code> attribute is not carried on the column.</p>
+</div>
+<div id="limitations" class="section level2">
+<h2>Limitations</h2>
+<ul>
+<li>Comma-less names are inherently ambiguous. The <code>auto</code>
+heuristic is biased toward the bibnets/Scopus surname-first convention
+and may misread uppercase <code>&quot;GIVEN SURNAME&quot;</code> when the surname
+is 1–3 letters (e.g. <code>&quot;MOHAMMED LI&quot;</code>). Pass
+<code>surname_first = &quot;no&quot;</code> to override.</li>
+<li>Suffix-first malformed input (<code>&quot;Jr., Sammy Davis&quot;</code>) is
+not specially handled.</li>
+<li>It normalises <em>string form</em>, not identity: it will not
+disambiguate two different people who share a surname and initial.</li>
+</ul>
+</div>
+<div id="summary" class="section level2">
+<h2>Summary</h2>
+<ul>
+<li><code>parse_names(x)</code> — vector in, vector out, with a
+<code>&quot;parts&quot;</code> attribute.</li>
+<li><code>lapply(df$authors, parse_names)</code> — for the authors
+list-column.</li>
+<li>Normalise <strong>before</strong> <code>author_network()</code> for
+correct node merging.</li>
+<li><code>format</code> = <code>&quot;first_last&quot;</code> /
+<code>&quot;last_initials&quot;</code> / <code>&quot;last&quot;</code>;
+<code>surname_first</code> = <code>&quot;auto&quot;</code> / <code>&quot;yes&quot;</code> /
+<code>&quot;no&quot;</code>.</li>
+</ul>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

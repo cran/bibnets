@@ -342,27 +342,86 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(bibnets)</span></code></pre></div>
-<div id="what-bibnets-builds" class="section level2">
-<h2>What bibnets Builds</h2>
-<p>Bibliometric data usually arrives as a table of papers. Each paper
-has fields such as authors, references, keywords, countries,
-institutions, source title, and year. Most bibliometric networks are
-projections of those fields.</p>
-<p>The core idea is simple:</p>
-<ol style="list-style-type: decimal">
-<li>Build a sparse <code>papers x entities</code> matrix.</li>
-<li>Weight the matrix with a counting method.</li>
-<li>Multiply the matrix to obtain entity-entity or paper-paper
-links.</li>
-<li>Return a standard edge list.</li>
-</ol>
-<p>Internally, this is the package pipeline:</p>
-<pre><code>build_bipartite()
-  -&gt; apply_counting()
-  -&gt; multiply_bipartite()
-  -&gt; as_bibnets_network()</code></pre>
-<p>The exported builders wrap that pipeline for common bibliometric
-questions:</p>
+<div id="introduction" class="section level2">
+<h2>Introduction</h2>
+<p><code>bibnets</code> constructs bibliometric networks from scholarly
+metadata. It imports the export formats of the major bibliographic
+databases, converts them internally to a common tabular representation,
+and projects that representation into networks through a single function
+per network type. The package covers the standard constructions and adds
+several that are less commonly available: position-based attention
+weighting, aggregation of entities into higher-level networks, a range
+of counting and similarity weights, and temporal construction over time
+windows.</p>
+<div id="data-import" class="section level3">
+<h3>Data import</h3>
+<p><code>bibnets</code> reads Scopus, Web of Science, OpenAlex,
+Lens.org, Dimensions, Crossref, BibTeX, and RIS exports.
+<code>read_biblio()</code> detects the format from file content and
+dispatches to the corresponding reader; all readers return an identical
+schema, so records from different databases can be combined without
+manual reconciliation. Multi-valued fields — authors, references, and
+keywords — are parsed into list-columns. A data frame already in this
+form is used directly, by naming the relevant column, without a
+reader.</p>
+</div>
+<div id="network-builders" class="section level3">
+<h3>Network builders</h3>
+<p>Dedicated builders construct co-authorship, co-citation,
+bibliographic coupling, keyword co-occurrence, direct citation, and
+historiograph networks; a generic builder covers other projections. The
+builders share one interface and return the same edge list, so the
+network type is determined by the function name.</p>
+</div>
+<div id="weighting-and-aggregation" class="section level3">
+<h3>Weighting and aggregation</h3>
+<p>Counting methods determine each publication’s contribution to an
+edge. They range from full and fractional counting to position-aware
+schemes (harmonic, geometric, golden-ratio, first, last, and
+first–last), and six similarity measures — cosine, association strength,
+Jaccard, inclusion, and equivalence — rescale the projected weights.</p>
+<p>Attention weighting assigns each author a positional weight that sums
+to one across the byline, so a publication’s credit is distributed by
+byline position rather than equally and a large author list does not
+dominate the network. Aggregation pools the references or members of a
+group to construct collaboration and coupling networks among countries,
+institutions, or sources rather than individuals. Temporal construction
+applies any builder over fixed, sliding, or cumulative windows, and a
+disparity-filter backbone retains the edges that are significant
+relative to each node’s strength.</p>
+</div>
+<div id="implementation" class="section level3">
+<h3>Implementation</h3>
+<p>The incidence matrix is stored as a sparse <code>dgCMatrix</code> and
+projected with <code>crossprod()</code> or <code>tcrossprod()</code>;
+edges are extracted without forming a dense node-by-node matrix, so
+memory scales with the number of non-zero co-occurrences rather than
+with the square of the vocabulary. The package imports only Matrix,
+stats, and utils.</p>
+</div>
+<div id="export-formats" class="section level3">
+<h3>Export formats</h3>
+<p>Constructed networks are exported to igraph, tidygraph, cograph,
+Gephi, GraphML, and sparse-matrix representations.</p>
+</div>
+<div id="output" class="section level3">
+<h3>Output</h3>
+<p>Every builder returns a
+<strong><code>bibnets_network</code></strong>: a tidy data frame with
+four columns —</p>
+<ul>
+<li><code>from</code>, <code>to</code> — the two endpoints of an
+edge,</li>
+<li><code>count</code> — the raw binary co-occurrence count for that
+pair,</li>
+<li><code>weight</code> — the analytical weight after counting and
+optional similarity normalization.</li>
+</ul>
+<p>With <code>counting = &quot;full&quot;</code> and
+<code>similarity = &quot;none&quot;</code>, <code>weight</code> equals
+<code>count</code>. They diverge once fractional counting or a
+similarity measure is applied.</p>
+<p>The builders, at a glance:</p>
 <table>
 <colgroup>
 <col width="33%" />
@@ -373,19 +432,19 @@ questions:</p>
 <tr class="header">
 <th>Function</th>
 <th>Nodes</th>
-<th>Link means</th>
+<th>An edge means</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td><code>author_network()</code></td>
 <td>authors</td>
-<td>co-authorship, author coupling, or author co-citation</td>
+<td>co-authorship, author coupling, or co-citation</td>
 </tr>
 <tr class="even">
 <td><code>reference_network()</code></td>
 <td>cited references</td>
-<td>references are cited together</td>
+<td>two references cited together</td>
 </tr>
 <tr class="odd">
 <td><code>document_network()</code></td>
@@ -395,11 +454,11 @@ questions:</p>
 <tr class="even">
 <td><code>keyword_network()</code></td>
 <td>keywords</td>
-<td>keywords appear together in papers</td>
+<td>two keywords appear together</td>
 </tr>
 <tr class="odd">
 <td><code>source_network()</code></td>
-<td>journals/sources</td>
+<td>journals</td>
 <td>sources share references or are co-cited</td>
 </tr>
 <tr class="even">
@@ -415,657 +474,779 @@ questions:</p>
 <tr class="even">
 <td><code>conetwork()</code></td>
 <td>any field</td>
-<td>entities co-occur or share values of another field</td>
+<td>entities co-occur, or share values of another field</td>
 </tr>
 <tr class="odd">
 <td><code>local_citations()</code></td>
 <td>documents</td>
-<td>local citation counts inside the corpus</td>
+<td>within-corpus citation counts</td>
 </tr>
 <tr class="even">
 <td><code>historiograph()</code></td>
 <td>documents</td>
-<td>directed citation history among locally cited papers</td>
+<td>directed citation history among top-cited papers</td>
 </tr>
 <tr class="odd">
 <td><code>temporal_network()</code></td>
 <td>any builder’s nodes</td>
-<td>the same network repeated over time windows</td>
+<td>the same network over time windows</td>
 </tr>
 </tbody>
 </table>
-<p>Every network builder returns a <code>bibnets_network</code>: a data
-frame with columns <code>from</code>, <code>to</code>,
-<code>weight</code>, and <code>count</code>.</p>
-<p><code>count</code> is the raw binary co-occurrence.
-<code>weight</code> is the analytical weight after counting and optional
-similarity normalization.</p>
 </div>
-<div id="data-used-in-this-vignette" class="section level2">
-<h2>Data Used in This Vignette</h2>
-<p>The package includes small and medium example datasets:</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">data</span>(biblio_data)</span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="fu">data</span>(scopus_quantum_cloud)</span>
-<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="fu">data</span>(open_alex_gold_open_access_learning_analytics)</span>
-<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a></span>
-<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>small <span class="ot">&lt;-</span> biblio_data</span>
-<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>sc <span class="ot">&lt;-</span> scopus_quantum_cloud</span>
-<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>oa <span class="ot">&lt;-</span> open_alex_gold_open_access_learning_analytics</span>
-<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a></span>
-<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a><span class="fu">nrow</span>(small)</span>
-<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a><span class="co">#&gt; [1] 10</span></span>
-<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a><span class="fu">nrow</span>(sc)</span>
-<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a><span class="co">#&gt; [1] 499</span></span>
-<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a><span class="fu">nrow</span>(oa)</span>
-<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a><span class="co">#&gt; [1] 1508</span></span></code></pre></div>
-<p><code>biblio_data</code> is a tiny synthetic dataset.
-<code>scopus_quantum_cloud</code> contains 499 Scopus records.
-<code>open_alex_gold_open_access_learning_analytics</code> contains
-1,508 OpenAlex records with authors, countries, institutions, and
-primary topics.</p>
+</div>
+<div id="quick-start" class="section level2">
+<h2>Quick start</h2>
+<p>You do <strong>not</strong> need a special reader. Any data frame
+with one row per paper works — point a builder at the column that holds
+the entity and tell it the delimiter:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>papers <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>  <span class="st">`</span><span class="at">Author Names</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">c</span>(<span class="st">&quot;Smith J, Doe A, Lee K&quot;</span>, <span class="st">&quot;Smith J, Lee K&quot;</span>,</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>                     <span class="st">&quot;Doe A, Lee K&quot;</span>, <span class="st">&quot;Smith J, Doe A&quot;</span>),</span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>  <span class="at">check.names =</span> <span class="cn">FALSE</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>)</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="fu">author_network</span>(papers, <span class="at">authors =</span> <span class="st">&quot;Author Names&quot;</span>, <span class="at">sep =</span> <span class="st">&quot;,&quot;</span>)</span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="co">#&gt; # bibnets network: author_collaboration | 3 nodes · 3 edges | counting: full </span></span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a><span class="co">#&gt;    from   to       weight  count</span></span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="co">#&gt; 1  DOE A  LEE K         2      2</span></span>
+<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a><span class="co">#&gt; 2  DOE A  SMITH J       2      2</span></span>
+<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a><span class="co">#&gt; 3  LEE K  SMITH J       2      2</span></span></code></pre></div>
+<p>If your data is a scholarly export instead, read it first — the
+format is detected from the file content — then build with the
+defaults:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>data    <span class="ot">&lt;-</span> <span class="fu">read_biblio</span>(<span class="st">&quot;scopus.csv&quot;</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>authors <span class="ot">&lt;-</span> <span class="fu">author_network</span>(data, <span class="at">type =</span> <span class="st">&quot;collaboration&quot;</span>)</span></code></pre></div>
+<p>Either way the result is the same four-column edge list, ready to
+inspect, prune, or export.</p>
 </div>
 <div id="reading-your-own-data" class="section level2">
-<h2>Reading Your Own Data</h2>
-<p>For files, use <code>read_biblio()</code>:</p>
+<h2>Reading your own data</h2>
+<div id="scholarly-exports" class="section level3">
+<h3>Scholarly exports</h3>
+<p><code>read_biblio()</code> accepts a file, a folder, or several
+files, and detects Scopus, Web of Science, OpenAlex, BibTeX, RIS,
+Lens.org, and Dimensions from the content:</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>data <span class="ot">&lt;-</span> <span class="fu">read_biblio</span>(<span class="st">&quot;export.csv&quot;</span>)</span>
 <span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>data <span class="ot">&lt;-</span> <span class="fu">read_biblio</span>(<span class="st">&quot;folder_with_exports/&quot;</span>)</span>
 <span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>data <span class="ot">&lt;-</span> <span class="fu">read_biblio</span>(<span class="fu">c</span>(<span class="st">&quot;part_1.csv&quot;</span>, <span class="st">&quot;part_2.csv&quot;</span>))</span></code></pre></div>
-<p><code>read_biblio()</code> detects common formats from file content.
-You can also call a reader directly:</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">read_scopus</span>(<span class="st">&quot;scopus.csv&quot;</span>)</span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="fu">read_wos</span>(<span class="st">&quot;savedrecs.txt&quot;</span>)</span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="fu">read_openalex_csv</span>(<span class="st">&quot;openalex_works.csv&quot;</span>)</span>
-<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="fu">read_dimensions</span>(<span class="st">&quot;dimensions.csv&quot;</span>)</span>
-<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="fu">read_lens</span>(<span class="st">&quot;lens.csv&quot;</span>)</span>
-<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="fu">read_bibtex</span>(<span class="st">&quot;library.bib&quot;</span>)</span>
-<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="fu">read_ris</span>(<span class="st">&quot;library.ris&quot;</span>)</span></code></pre></div>
-<p>For a custom CSV, specify the identifier and the columns that should
-be split into list-columns:</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>data <span class="ot">&lt;-</span> <span class="fu">read_biblio</span>(</span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  <span class="st">&quot;custom.csv&quot;</span>,</span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="at">format =</span> <span class="st">&quot;generic&quot;</span>,</span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="at">id =</span> <span class="st">&quot;paper_id&quot;</span>,</span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  <span class="at">actors =</span> <span class="fu">c</span>(<span class="st">&quot;Authors&quot;</span>, <span class="st">&quot;Keywords&quot;</span>),</span>
-<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>  <span class="at">sep =</span> <span class="st">&quot;;&quot;</span></span>
-<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>)</span></code></pre></div>
-<p>Readers return a common schema where possible:</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="fu">names</span>(sc)[<span class="dv">1</span><span class="sc">:</span><span class="dv">12</span>]</span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="co">#&gt;  [1] &quot;id&quot;             &quot;title&quot;          &quot;year&quot;           &quot;journal&quot;       </span></span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="co">#&gt;  [5] &quot;doi&quot;            &quot;cited_by_count&quot; &quot;abstract&quot;       &quot;type&quot;          </span></span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="co">#&gt;  [9] &quot;authors&quot;        &quot;references&quot;     &quot;keywords&quot;       &quot;affiliations&quot;</span></span></code></pre></div>
-<p>The most important columns for network construction are:</p>
-<ul>
-<li><code>id</code>: the document identifier.</li>
-<li><code>authors</code>: a list-column of author names.</li>
-<li><code>references</code>: a list-column of cited references or cited
-work IDs.</li>
-<li><code>keywords</code>: a list-column of author/index/topic
-keywords.</li>
-<li><code>year</code>: the time variable used by
-<code>temporal_network()</code>.</li>
-</ul>
-<p>Source-specific columns such as <code>countries</code>,
-<code>affiliations</code>, <code>index_keywords</code>, and
-<code>keywords_plus</code> are preserved when available.</p>
+<p>The format-specific readers can also be called directly
+(<code>read_scopus()</code>, <code>read_wos()</code>,
+<code>read_openalex_csv()</code>, <code>read_dimensions()</code>,
+<code>read_lens()</code>, <code>read_bibtex()</code>,
+<code>read_ris()</code>).</p>
+</div>
+<div id="a-custom-csv" class="section level3">
+<h3>A custom CSV</h3>
+<p>For a CSV that matches no known export, map each source column onto a
+standard field <strong>by name</strong> — <code>authors</code>,
+<code>keywords</code>, <code>references</code>, <code>countries</code>,
+<code>affiliations</code>, or <code>journal</code>. Naming any of them
+reads the file as a generic CSV, so you do not pass <code>format</code>
+yourself:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>data <span class="ot">&lt;-</span> <span class="fu">read_biblio</span>(</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>  <span class="st">&quot;custom.csv&quot;</span>,</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  <span class="at">id       =</span> <span class="st">&quot;paper_id&quot;</span>,</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>  <span class="at">authors  =</span> <span class="st">&quot;Author Names&quot;</span>,</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>  <span class="at">keywords =</span> <span class="st">&quot;Tags&quot;</span>,</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>  <span class="at">sep      =</span> <span class="st">&quot;,&quot;</span></span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>)</span></code></pre></div>
+<p>Each mapped column is split on <code>sep</code> into the standard
+list-column, so afterwards every builder works with its defaults.</p>
+</div>
+<div id="a-plain-data-frame-directly" class="section level3">
+<h3>A plain data frame, directly</h3>
+<p>As the quick start showed, you can skip the reader entirely and let
+the builder split a column for you. The same column arguments are
+available on every builder:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">author_network</span>(my_df, <span class="at">authors =</span> <span class="st">&quot;Author Names&quot;</span>, <span class="at">sep =</span> <span class="st">&quot;,&quot;</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="fu">keyword_network</span>(my_df, <span class="at">keywords =</span> <span class="st">&quot;Tags&quot;</span>,       <span class="at">sep =</span> <span class="st">&quot;,&quot;</span>)</span></code></pre></div>
+<p>The work identifier is the <code>id</code> column. You need not
+supply one: when no <code>id</code> column is present each row is
+treated as one document; pass <code>id = &quot;paper_id&quot;</code> to use a
+differently-named column. Surrounding quotes are stripped by default
+(<code>strip_quotes = TRUE</code>), and in a coupling network the
+references column takes its own <code>references_sep</code>. The
+companion <code>vignette(&quot;reading-data&quot;)</code> covers every reader and
+these options in full.</p>
+</div>
+<div id="the-standard-schema" class="section level3">
+<h3>The standard schema</h3>
+<p>Readers return a common set of columns:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="fu">data</span>(scopus_quantum_cloud)</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>sc <span class="ot">&lt;-</span> scopus_quantum_cloud</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="fu">names</span>(sc)[<span class="dv">1</span><span class="sc">:</span><span class="dv">12</span>]</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="co">#&gt;  [1] &quot;id&quot;             &quot;title&quot;          &quot;year&quot;           &quot;journal&quot;       </span></span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="co">#&gt;  [5] &quot;doi&quot;            &quot;cited_by_count&quot; &quot;abstract&quot;       &quot;type&quot;          </span></span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="co">#&gt;  [9] &quot;authors&quot;        &quot;references&quot;     &quot;keywords&quot;       &quot;affiliations&quot;</span></span></code></pre></div>
+<p>The columns that matter for network construction are <code>id</code>,
+the list-columns <code>authors</code> / <code>references</code> /
+<code>keywords</code>, and <code>year</code> (used by
+<code>temporal_network()</code>). Source-specific extras such as
+<code>countries</code>, <code>affiliations</code>, and
+<code>keywords_plus</code> are kept when available.</p>
+</div>
+</div>
+<div id="datasets-used-here" class="section level2">
+<h2>Datasets used here</h2>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">data</span>(biblio_data)</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="fu">data</span>(learning_analytics)</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a></span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>small <span class="ot">&lt;-</span> biblio_data            <span class="co"># tiny, synthetic</span></span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>oa    <span class="ot">&lt;-</span> learning_analytics     <span class="co"># 1,508 OpenAlex records on learning analytics</span></span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a></span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a><span class="fu">c</span>(<span class="at">small =</span> <span class="fu">nrow</span>(small), <span class="at">scopus =</span> <span class="fu">nrow</span>(sc), <span class="at">openalex =</span> <span class="fu">nrow</span>(oa))</span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a><span class="co">#&gt;    small   scopus openalex </span></span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a><span class="co">#&gt;       10      499     1508</span></span></code></pre></div>
 </div>
 <div id="author-collaboration" class="section level2">
-<h2>Author Collaboration</h2>
-<p>The simplest author network links two authors when they appear on the
-same paper:</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>authors_full <span class="ot">&lt;-</span> <span class="fu">author_network</span>(oa, <span class="at">type =</span> <span class="st">&quot;collaboration&quot;</span>)</span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="fu">head</span>(authors_full, <span class="dv">5</span>)</span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="co">#&gt; # bibnets network: author_collaboration | 9 nodes · 5 edges | counting: full </span></span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="co">#&gt;    from                        to                          weight  count</span></span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="co">#&gt; 1  MOHAMMED SAQR               SONSOLES LÓPEZ‐PERNAS        19     19</span></span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a><span class="co">#&gt; 2  CRISTIAN CECHINEL           ROBERTO MUÑOZ                  11     11</span></span>
-<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a><span class="co">#&gt; 3  DRAGAN GAŠEVIĆ            ROBERTO MARTÍNEZ‐MALDONADO      10     10</span></span>
-<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a><span class="co">#&gt; 4  ROBERTO MARTÍNEZ‐MALDONADO  VANESSA ECHEVERRÍA             10     10</span></span>
-<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a><span class="co">#&gt; 5  FERNANDA PIRES              MARCELA PESSOA                   8      8</span></span></code></pre></div>
-<p>The printed result has the standard schema:</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="fu">summary</span>(authors_full)</span>
-<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="co">#&gt; bibnets network</span></span>
-<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="co">#&gt; ------------------------------</span></span>
-<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a><span class="co">#&gt; Type       : author_collaboration</span></span>
-<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="co">#&gt; Counting   : full</span></span>
-<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a><span class="co">#&gt; Similarity : none</span></span>
-<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a><span class="co">#&gt; Nodes      : 4029</span></span>
-<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a><span class="co">#&gt; Edges      : 12270</span></span>
-<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a><span class="co">#&gt; Density    : 0.0015</span></span>
-<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a><span class="co">#&gt; Weight     : min 1  median 1  max 19</span></span>
-<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a><span class="co">#&gt; Top nodes  : DRAGAN GAŠEVIĆ(89), ARI KORHONEN(60), CLAUDIA SZABO(60), JUDY SHEARD(60), PAUL DENNY(56)</span></span></code></pre></div>
-<p>Use <code>min_occur</code> to remove very rare authors before
+<h2>Author collaboration</h2>
+<p>Two authors are linked when they appear on the same paper:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>authors <span class="ot">&lt;-</span> <span class="fu">author_network</span>(oa, <span class="at">type =</span> <span class="st">&quot;collaboration&quot;</span>)</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="fu">head</span>(authors, <span class="dv">5</span>)</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="co">#&gt; # bibnets network: author_collaboration | 9 nodes · 5 edges | counting: full </span></span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a><span class="co">#&gt;    from                        to                          weight  count</span></span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="co">#&gt; 1  MOHAMMED SAQR               SONSOLES LÓPEZ‐PERNAS        19     19</span></span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a><span class="co">#&gt; 2  CRISTIAN CECHINEL           ROBERTO MUÑOZ                  11     11</span></span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a><span class="co">#&gt; 3  DRAGAN GAŠEVIĆ            ROBERTO MARTÍNEZ‐MALDONADO      10     10</span></span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a><span class="co">#&gt; 4  ROBERTO MARTÍNEZ‐MALDONADO  VANESSA ECHEVERRÍA             10     10</span></span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a><span class="co">#&gt; 5  FERNANDA PIRES              MARCELA PESSOA                   8      8</span></span>
+<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a><span class="fu">summary</span>(authors)</span>
+<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a><span class="co">#&gt; bibnets network</span></span>
+<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a><span class="co">#&gt; ------------------------------</span></span>
+<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a><span class="co">#&gt; Type       : author_collaboration</span></span>
+<span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a><span class="co">#&gt; Counting   : full</span></span>
+<span id="cb9-15"><a href="#cb9-15" tabindex="-1"></a><span class="co">#&gt; Similarity : none</span></span>
+<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a><span class="co">#&gt; Nodes      : 4029</span></span>
+<span id="cb9-17"><a href="#cb9-17" tabindex="-1"></a><span class="co">#&gt; Edges      : 12270</span></span>
+<span id="cb9-18"><a href="#cb9-18" tabindex="-1"></a><span class="co">#&gt; Density    : 0.0015</span></span>
+<span id="cb9-19"><a href="#cb9-19" tabindex="-1"></a><span class="co">#&gt; Weight     : min 1  median 1  max 19</span></span>
+<span id="cb9-20"><a href="#cb9-20" tabindex="-1"></a><span class="co">#&gt; Top nodes  : DRAGAN GAŠEVIĆ(89), ARI KORHONEN(60), CLAUDIA SZABO(60), JUDY SHEARD(60), PAUL DENNY(56)</span></span></code></pre></div>
+<p>Use <code>min_occur</code> to drop rare authors before
 projection:</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>authors_core <span class="ot">&lt;-</span> <span class="fu">author_network</span>(oa, <span class="st">&quot;collaboration&quot;</span>, <span class="at">min_occur =</span> <span class="dv">2</span>)</span>
-<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a><span class="fu">nrow</span>(authors_full)</span>
-<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a><span class="co">#&gt; [1] 12270</span></span>
-<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="fu">nrow</span>(authors_core)</span>
-<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a><span class="co">#&gt; [1] 1362</span></span></code></pre></div>
-</div>
-<div id="counting-methods" class="section level2">
-<h2>Counting Methods</h2>
-<p>Counting determines how much a paper contributes to edge weights.</p>
-<p>Full counting gives every observed co-occurrence a weight of 1:</p>
-<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">author_network</span>(small, <span class="st">&quot;collaboration&quot;</span>, <span class="at">counting =</span> <span class="st">&quot;full&quot;</span>), <span class="dv">5</span>)</span>
-<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="co">#&gt; # bibnets network: author_collaboration | 5 nodes · 5 edges | counting: full </span></span>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="fu">nrow</span>(<span class="fu">author_network</span>(oa, <span class="at">type =</span> <span class="st">&quot;collaboration&quot;</span>))</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a><span class="co">#&gt; [1] 12270</span></span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a><span class="fu">nrow</span>(<span class="fu">author_network</span>(oa, <span class="at">type =</span> <span class="st">&quot;collaboration&quot;</span>, <span class="at">min_occur =</span> <span class="dv">2</span>))</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="co">#&gt; [1] 1362</span></span></code></pre></div>
+<div id="counting-methods" class="section level3">
+<h3>Counting methods</h3>
+<p><code>counting</code> controls how much each paper contributes to an
+edge:</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">author_network</span>(small, <span class="at">type =</span> <span class="st">&quot;collaboration&quot;</span>, <span class="at">counting =</span> <span class="st">&quot;full&quot;</span>), <span class="dv">3</span>)</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="co">#&gt; # bibnets network: author_collaboration | 4 nodes · 3 edges | counting: full </span></span>
 <span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a><span class="co">#&gt;    from     to       weight  count</span></span>
 <span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a><span class="co">#&gt; 1  CHEN W   LEE K         3      3</span></span>
 <span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a><span class="co">#&gt; 2  BROWN M  SMITH J       3      3</span></span>
 <span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a><span class="co">#&gt; 3  BROWN M  LEE K         2      2</span></span>
-<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a><span class="co">#&gt; 4  JONES A  LEE K         2      2</span></span>
-<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a><span class="co">#&gt; 5  JONES A  SMITH J       2      2</span></span></code></pre></div>
-<p>Fractional counting reduces the influence of long author lists:</p>
-<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">author_network</span>(small, <span class="st">&quot;collaboration&quot;</span>, <span class="at">counting =</span> <span class="st">&quot;fractional&quot;</span>), <span class="dv">5</span>)</span>
-<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a><span class="co">#&gt; # bibnets network: author_collaboration | 5 nodes · 5 edges | counting: fractional </span></span>
-<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a><span class="co">#&gt;    from     to       weight  count</span></span>
-<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a><span class="co">#&gt; 1  CHEN W   LEE K         2      3</span></span>
-<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a><span class="co">#&gt; 2  BROWN M  SMITH J       2      3</span></span>
-<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a><span class="co">#&gt; 3  JONES A  SMITH J     1.5      2</span></span>
-<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a><span class="co">#&gt; 4  BROWN M  LEE K         1      2</span></span>
-<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a><span class="co">#&gt; 5  JONES A  LEE K         1      2</span></span></code></pre></div>
-<p>Harmonic counting gives more credit to earlier byline positions while
-keeping the paper’s total credit normalized:</p>
-<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">author_network</span>(small, <span class="st">&quot;collaboration&quot;</span>, <span class="at">counting =</span> <span class="st">&quot;harmonic&quot;</span>), <span class="dv">5</span>)</span>
-<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a><span class="co">#&gt; # bibnets network: author_collaboration | 6 nodes · 5 edges | counting: harmonic </span></span>
-<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a><span class="co">#&gt;    from     to       weight  count</span></span>
-<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a><span class="co">#&gt; 1  BROWN M  SMITH J  0.4702      3</span></span>
-<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a><span class="co">#&gt; 2  JONES A  SMITH J   0.371      2</span></span>
-<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a><span class="co">#&gt; 3  CHEN W   LEE K    0.3214      3</span></span>
-<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a><span class="co">#&gt; 4  CHEN W   DAVIS R  0.2222      1</span></span>
-<span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a><span class="co">#&gt; 5  DAVIS R  JONES A  0.2222      1</span></span></code></pre></div>
-<p>First-last counting is useful only when the field’s authorship
-conventions make both first and last positions meaningful:</p>
-<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">author_network</span>(small, <span class="st">&quot;collaboration&quot;</span>, <span class="at">counting =</span> <span class="st">&quot;first_last&quot;</span>), <span class="dv">5</span>)</span>
-<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a><span class="co">#&gt; # bibnets network: author_collaboration | 6 nodes · 5 edges | counting: first_last </span></span>
-<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a><span class="co">#&gt;    from     to       weight  count</span></span>
-<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a><span class="co">#&gt; 1  BROWN M  SMITH J    0.49      3</span></span>
-<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a><span class="co">#&gt; 2  CHEN W   LEE K      0.41      3</span></span>
-<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a><span class="co">#&gt; 3  JONES A  SMITH J    0.33      2</span></span>
-<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a><span class="co">#&gt; 4  LEE K    SMITH J    0.32      2</span></span>
-<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a><span class="co">#&gt; 5  CHEN W   DAVIS R    0.25      1</span></span></code></pre></div>
-<p>The correct method depends on the claim being made. Use
-<code>full</code> when the question is about observed collaboration
-events. Use <code>fractional</code> when papers with many entities
-should not dominate. Use position-dependent methods only when author
-order is analytically meaningful.</p>
-</div>
-<div id="attention-style-position-weights" class="section level2">
-<h2>Attention-Style Position Weights</h2>
-<p>The <code>attention</code> argument applies a smooth position
-profile. It is separate from <code>counting</code> and is available for
-author, keyword, country, and institution networks.</p>
-<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>lead <span class="ot">&lt;-</span> <span class="fu">author_network</span>(small, <span class="at">attention =</span> <span class="st">&quot;lead&quot;</span>)</span>
-<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>last <span class="ot">&lt;-</span> <span class="fu">author_network</span>(small, <span class="at">attention =</span> <span class="st">&quot;last&quot;</span>)</span>
-<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a></span>
-<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a><span class="fu">head</span>(lead, <span class="dv">5</span>)</span>
-<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a><span class="co">#&gt; # bibnets network: author_attention_lead | 5 nodes · 5 edges | counting: lead </span></span>
-<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a><span class="co">#&gt;    from     to       weight  count</span></span>
-<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a><span class="co">#&gt; 1  BROWN M  SMITH J  0.3896      3</span></span>
-<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a><span class="co">#&gt; 2  JONES A  SMITH J  0.3437      2</span></span>
-<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a><span class="co">#&gt; 3  JONES A  LEE K    0.2041      2</span></span>
-<span id="cb15-10"><a href="#cb15-10" tabindex="-1"></a><span class="co">#&gt; 4  CHEN W   LEE K    0.2008      3</span></span>
-<span id="cb15-11"><a href="#cb15-11" tabindex="-1"></a><span class="co">#&gt; 5  BROWN M  CHEN W   0.1837      1</span></span>
-<span id="cb15-12"><a href="#cb15-12" tabindex="-1"></a><span class="fu">head</span>(last, <span class="dv">5</span>)</span>
-<span id="cb15-13"><a href="#cb15-13" tabindex="-1"></a><span class="co">#&gt; # bibnets network: author_attention_last | 6 nodes · 5 edges | counting: last </span></span>
-<span id="cb15-14"><a href="#cb15-14" tabindex="-1"></a><span class="co">#&gt;    from     to       weight  count</span></span>
-<span id="cb15-15"><a href="#cb15-15" tabindex="-1"></a><span class="co">#&gt; 1  CHEN W   LEE K    0.5273      3</span></span>
-<span id="cb15-16"><a href="#cb15-16" tabindex="-1"></a><span class="co">#&gt; 2  BROWN M  LEE K    0.2296      2</span></span>
-<span id="cb15-17"><a href="#cb15-17" tabindex="-1"></a><span class="co">#&gt; 3  BROWN M  SMITH J  0.2263      3</span></span>
-<span id="cb15-18"><a href="#cb15-18" tabindex="-1"></a><span class="co">#&gt; 4  JONES A  LEE K    0.2041      2</span></span>
-<span id="cb15-19"><a href="#cb15-19" tabindex="-1"></a><span class="co">#&gt; 5  DAVIS R  SMITH J  0.1837      1</span></span></code></pre></div>
-<p>The four profiles are:</p>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">author_network</span>(small, <span class="at">type =</span> <span class="st">&quot;collaboration&quot;</span>, <span class="at">counting =</span> <span class="st">&quot;fractional&quot;</span>), <span class="dv">3</span>)</span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a><span class="co">#&gt; # bibnets network: author_collaboration | 5 nodes · 3 edges | counting: fractional </span></span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a><span class="co">#&gt;    from     to       weight  count</span></span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a><span class="co">#&gt; 1  CHEN W   LEE K         2      3</span></span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a><span class="co">#&gt; 2  BROWN M  SMITH J       2      3</span></span>
+<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a><span class="co">#&gt; 3  JONES A  SMITH J     1.5      2</span></span>
+<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">author_network</span>(small, <span class="at">type =</span> <span class="st">&quot;collaboration&quot;</span>, <span class="at">counting =</span> <span class="st">&quot;harmonic&quot;</span>), <span class="dv">3</span>)</span>
+<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a><span class="co">#&gt; # bibnets network: author_collaboration | 5 nodes · 3 edges | counting: harmonic </span></span>
+<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a><span class="co">#&gt;    from     to       weight  count</span></span>
+<span id="cb11-16"><a href="#cb11-16" tabindex="-1"></a><span class="co">#&gt; 1  BROWN M  SMITH J  0.4702      3</span></span>
+<span id="cb11-17"><a href="#cb11-17" tabindex="-1"></a><span class="co">#&gt; 2  JONES A  SMITH J   0.371      2</span></span>
+<span id="cb11-18"><a href="#cb11-18" tabindex="-1"></a><span class="co">#&gt; 3  CHEN W   LEE K    0.3214      3</span></span>
+<span id="cb11-19"><a href="#cb11-19" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">author_network</span>(small, <span class="at">type =</span> <span class="st">&quot;collaboration&quot;</span>, <span class="at">counting =</span> <span class="st">&quot;first_last&quot;</span>), <span class="dv">3</span>)</span>
+<span id="cb11-20"><a href="#cb11-20" tabindex="-1"></a><span class="co">#&gt; # bibnets network: author_collaboration | 5 nodes · 3 edges | counting: first_last </span></span>
+<span id="cb11-21"><a href="#cb11-21" tabindex="-1"></a><span class="co">#&gt;    from     to       weight  count</span></span>
+<span id="cb11-22"><a href="#cb11-22" tabindex="-1"></a><span class="co">#&gt; 1  BROWN M  SMITH J    0.49      3</span></span>
+<span id="cb11-23"><a href="#cb11-23" tabindex="-1"></a><span class="co">#&gt; 2  CHEN W   LEE K      0.41      3</span></span>
+<span id="cb11-24"><a href="#cb11-24" tabindex="-1"></a><span class="co">#&gt; 3  JONES A  SMITH J    0.33      2</span></span></code></pre></div>
+<p>The available methods differ in how they weight the rows or positions
+before projection:</p>
 <table>
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Method</th>
+<th>What it does</th>
+<th>Trade-off</th>
+<th>When to use</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>&quot;full&quot;</code></td>
+<td>Leaves the binary incidence matrix unchanged; for positional author
+weights, every listed entity receives weight 1.</td>
+<td>Large teams or long lists create many full-strength pairs.</td>
+<td>Use for raw event counts where every observed co-occurrence should
+count equally.</td>
+</tr>
+<tr class="even">
+<td><code>&quot;fractional&quot;</code></td>
+<td>For symmetric networks, each row contributes
+<code>1 / (n - 1)</code> to pairs when <code>n &gt; 1</code>; for
+coupling it uses <code>1 / n</code>; positional use gives each entity
+<code>1 / n</code>.</td>
+<td>Reduces large-list dominance but treats all positions equally.</td>
+<td>Use when each paper or reference list should have limited influence
+and position is not meaningful.</td>
+</tr>
+<tr class="odd">
+<td><code>&quot;paper&quot;</code></td>
+<td>For symmetric networks, each paper’s pair budget is scaled by
+<code>2 / (n * (n - 1))</code>; for coupling it uses
+<code>1 / n</code>.</td>
+<td>Normalizes at the paper level, so very large and very small papers
+can contribute comparable total pair mass.</td>
+<td>Use when publications, rather than individual author/entity pairs,
+should be the main unit of contribution.</td>
+</tr>
+<tr class="even">
+<td><code>&quot;strength&quot;</code></td>
+<td>Multiplies entity columns by the square root of inverse document
+frequency, <code>sqrt(log(n_works / entity_frequency))</code>; row-size
+scaling for coupling is deferred to projection.</td>
+<td>Downweights ubiquitous entities and emphasizes rarer shared
+entities; values are less like direct counts.</td>
+<td>Use for coupling or profile similarity where common references,
+keywords, or entities should carry less evidence.</td>
+</tr>
+<tr class="odd">
+<td><code>&quot;harmonic&quot;</code></td>
+<td>Uses positional weights proportional to <code>1 / position</code>,
+normalized to sum to one.</td>
+<td>Strongly favors early positions while still giving every later
+position some credit.</td>
+<td>Use when author order matters and early authorship should dominate
+without excluding later authors.</td>
+</tr>
+<tr class="even">
+<td><code>&quot;arithmetic&quot;</code></td>
+<td>Uses a linear decline from first to last, proportional to
+<code>n - position + 1</code>, normalized.</td>
+<td>Gives a gentler first-author advantage than geometric methods.</td>
+<td>Use when byline order matters but credit should decrease steadily
+rather than sharply.</td>
+</tr>
+<tr class="odd">
+<td><code>&quot;geometric&quot;</code></td>
+<td>Uses weights proportional to <code>0.5^(position - 1)</code>,
+normalized.</td>
+<td>Concentrates credit heavily at the front of the byline.</td>
+<td>Use when the first few positions are expected to carry most of the
+contribution.</td>
+</tr>
+<tr class="even">
+<td><code>&quot;adaptive_geometric&quot;</code></td>
+<td>Uses a geometric sequence normalized so the first-to-last weight
+ratio equals <code>n</code> (<code>2/3</code>, <code>1/3</code> for two
+authors).</td>
+<td>Adapts the steepness to team size, making long bylines more
+front-loaded.</td>
+<td>Use when first-author emphasis should increase with the number of
+authors.</td>
+</tr>
+<tr class="odd">
+<td><code>&quot;golden&quot;</code></td>
+<td>Uses golden-ratio decay, proportional to
+<code>phi^(n - position)</code>, normalized.</td>
+<td>More front-loaded than arithmetic but less abrupt than fixed
+halving.</td>
+<td>Use as a moderate positional decay when author order matters but
+geometric halving is too strong.</td>
+</tr>
+<tr class="even">
+<td><code>&quot;first&quot;</code></td>
+<td>Gives weight 1 to the first position and 0 to all others.</td>
+<td>Ignores all non-first contributors.</td>
+<td>Use for strict first-author analyses.</td>
+</tr>
+<tr class="odd">
+<td><code>&quot;last&quot;</code></td>
+<td>Gives weight 1 to the last position and 0 to all others.</td>
+<td>Ignores all non-last contributors.</td>
+<td>Use where last authorship represents the analytical role of
+interest, such as senior or PI credit.</td>
+</tr>
+<tr class="even">
+<td><code>&quot;first_last&quot;</code></td>
+<td>With two authors, assigns <code>0.5</code> and <code>0.5</code>;
+otherwise gives first and last authors an elevated weight and middle
+authors a baseline weight, all normalized.</td>
+<td>Highlights both endpoints while still retaining middle-author
+credit.</td>
+<td>Use in fields where first and last positions have distinct credit or
+leadership meanings.</td>
+</tr>
+<tr class="odd">
+<td><code>&quot;position_weighted&quot;</code></td>
+<td>Uses the supplied <code>position_weights</code> vector, extending
+the last value to longer bylines, then normalizes.</td>
+<td>Puts the burden of choosing defensible weights on the analyst.</td>
+<td>Use when you have field-specific or study-specific positional
+weights.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="attention-weights" class="section level3">
+<h3>Attention weights</h3>
+<p>Standard bibliometric co-authorship networks treat every byline
+position as equivalent: a first author who conceived and drove the work
+is weighted identically to a fifteenth contributor who provided a single
+instrument reading. On hyper-authored papers this produces dense,
+low-meaning co-authorship ties that drown out the focused two- or
+three-author collaborations that often signal the sharpest intellectual
+kinship. The attention weighting feature in <code>bibnets</code> is
+designed to correct this. The name is an honest analogy to the attention
+mechanism in large language models: just as a transformer assigns a
+normalized probability distribution across the tokens in a sequence —
+concentrating weight on what matters, spreading it thin over the rest —
+<code>bibnets</code> assigns each author on a paper a positional weight
+that sums to one across the full byline. A fifty-author paper therefore
+contributes exactly one unit of connection budget, the same as a
+two-author paper, and the distribution of that budget reflects
+authorship conventions: <code>&quot;lead&quot;</code> concentrates weight on the
+first author, <code>&quot;last&quot;</code> on the senior or PI position,
+<code>&quot;proximity&quot;</code> rewards the central authors, and
+<code>&quot;circular&quot;</code> rewards both ends jointly. The weights are a
+fixed positional prior, not learned content-based attention, but they
+carry real scholarly meaning, and activating them requires nothing more
+than passing <code>attention = &quot;lead&quot;</code> (or any of the three
+alternatives) to any of the author, keyword, country, or institution
+network functions.</p>
+<table>
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+</colgroup>
 <thead>
 <tr class="header">
 <th><code>attention</code></th>
-<th>Highest weight</th>
+<th>Weight vector</th>
+<th>Scholarly assumption</th>
+<th>When it fits</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td><code>&quot;lead&quot;</code></td>
-<td>first position</td>
+<td>Quadratic drop from the first position: the first position has raw
+weight <code>n^2</code>, inner positions decline as the byline advances,
+and the last position has raw weight <code>1</code>, then all weights
+are normalized.</td>
+<td>The lead author is the main intellectual driver.</td>
+<td>Use in first-author-oriented fields or questions about lead
+contribution.</td>
 </tr>
 <tr class="even">
 <td><code>&quot;last&quot;</code></td>
-<td>last position</td>
+<td>Quadratic rise to the last position: the first position has raw
+weight <code>1</code>, inner positions rise across the byline, and the
+last position has raw weight <code>n^2</code>, then all weights are
+normalized.</td>
+<td>The last author represents senior, supervisory, or PI
+contribution.</td>
+<td>Use in disciplines where last authorship marks lab leadership or
+supervision.</td>
 </tr>
 <tr class="odd">
 <td><code>&quot;proximity&quot;</code></td>
-<td>middle positions</td>
+<td>Pyramid profile using <code>min(position, n + 1 - position)</code>:
+first and last positions have raw weight <code>1</code>, inner positions
+increase toward the middle, and central positions are highest.</td>
+<td>Central byline positions deserve the most attention.</td>
+<td>Use when the question treats middle-position contributors as the
+focal group.</td>
 </tr>
 <tr class="even">
 <td><code>&quot;circular&quot;</code></td>
-<td>first and last positions</td>
+<td>Edge profile using <code>max(position, n + 1 - position)</code>:
+first and last positions have the largest raw weight, while inner
+positions decline toward the center.</td>
+<td>Both ends of the byline are prominent.</td>
+<td>Use where lead and senior positions jointly matter more than middle
+positions.</td>
 </tr>
 </tbody>
 </table>
-<p>Use attention weighting when the analysis needs a transparent
-positional assumption rather than a named bibliometric counting
-convention.</p>
+<p><code>attention</code> applies a smooth positional profile instead of
+a named counting scheme (available for author, keyword, country, and
+institution networks):</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">author_network</span>(small, <span class="at">attention =</span> <span class="st">&quot;lead&quot;</span>), <span class="dv">3</span>)</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a><span class="co">#&gt; # bibnets network: author_attention_lead | 4 nodes · 3 edges | counting: lead </span></span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a><span class="co">#&gt;    from     to       weight  count</span></span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a><span class="co">#&gt; 1  BROWN M  SMITH J  0.3896      3</span></span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a><span class="co">#&gt; 2  JONES A  SMITH J  0.3437      2</span></span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a><span class="co">#&gt; 3  JONES A  LEE K    0.2041      2</span></span></code></pre></div>
+</div>
 </div>
 <div id="reference-co-citation" class="section level2">
-<h2>Reference Co-citation</h2>
-<p>Co-citation links two cited references when they are cited together
-by at least one paper:</p>
-<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>refs <span class="ot">&lt;-</span> <span class="fu">reference_network</span>(sc, <span class="at">min_occur =</span> <span class="dv">2</span>)</span>
-<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a><span class="fu">head</span>(refs, <span class="dv">5</span>)</span>
-<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a><span class="co">#&gt; # bibnets network: reference_co_citation | 7 nodes · 5 edges | counting: full </span></span>
-<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a><span class="co">#&gt;    from                            to                              weight  count</span></span>
-<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a><span class="co">#&gt; 1  HE K., ZHANG X., REN S., SUN …  SIMONYAN K., ZISSERMAN A., VE…      10     10</span></span>
-<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a><span class="co">#&gt; 2  HE K., ZHANG X., REN S., SUN …  SANDLER M., HOWARD A., ZHU M.…       8      8</span></span>
-<span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a><span class="co">#&gt; 3  HAN S., MAO H., DALLY W.J., D…  SIMONYAN K., ZISSERMAN A., VE…       8      8</span></span>
-<span id="cb16-8"><a href="#cb16-8" tabindex="-1"></a><span class="co">#&gt; 4  HE K., ZHANG X., REN S., SUN …  SIMONYAN K., ZISSERMAN A., VE…       8      8</span></span>
-<span id="cb16-9"><a href="#cb16-9" tabindex="-1"></a><span class="co">#&gt; 5  KRIZHEVSKY A., HINTON G., LEA…  SIMONYAN K., ZISSERMAN A., VE…       7      7</span></span></code></pre></div>
-<p>Co-citation is a column-mode projection of the
-<code>papers x references</code> matrix. The nodes are references; the
-links come from papers that cite both references.</p>
-<p>Similarity normalization can reduce the advantage of very frequently
-cited references:</p>
-<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a>refs_cos <span class="ot">&lt;-</span> <span class="fu">reference_network</span>(sc, <span class="at">min_occur =</span> <span class="dv">2</span>, <span class="at">similarity =</span> <span class="st">&quot;cosine&quot;</span>)</span>
-<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a><span class="fu">head</span>(refs_cos, <span class="dv">5</span>)</span>
-<span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a><span class="co">#&gt; # bibnets network: reference_co_citation | 10 nodes · 5 edges | counting: full | similarity: cosine </span></span>
-<span id="cb17-4"><a href="#cb17-4" tabindex="-1"></a><span class="co">#&gt;    from                            to                              weight  count</span></span>
-<span id="cb17-5"><a href="#cb17-5" tabindex="-1"></a><span class="co">#&gt; 1  ANDRI R., CAVIGELLI L., ROSSI…  CAPOTONDI A., RUSCI M., FARIS…       1      2</span></span>
-<span id="cb17-6"><a href="#cb17-6" tabindex="-1"></a><span class="co">#&gt; 2  BAI Y., ZENG B., LI C., ZHANG…  CASTELLI M., CLEMENTE F.M., P…       1      2</span></span>
-<span id="cb17-7"><a href="#cb17-7" tabindex="-1"></a><span class="co">#&gt; 3  CHEN K., ET AL., A DNN OPTIMI…  CHEN Y., ET AL., SAMBA: SINGL…       1      2</span></span>
-<span id="cb17-8"><a href="#cb17-8" tabindex="-1"></a><span class="co">#&gt; 4  CHELLAPILLA K., PURI S., SIMA…  CHETLUR S., WOOLLEY C., VANDE…       1      2</span></span>
-<span id="cb17-9"><a href="#cb17-9" tabindex="-1"></a><span class="co">#&gt; 5  ATITALLAH B.B., HU Z., BOUCHA…  CHMURSKI M., ZUBERT M., BIERZ…       1      2</span></span></code></pre></div>
+<h2>Reference co-citation</h2>
+<p>Two references are linked when a paper cites both:</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>refs <span class="ot">&lt;-</span> <span class="fu">reference_network</span>(sc, <span class="at">min_occur =</span> <span class="dv">2</span>)</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a><span class="fu">head</span>(refs, <span class="dv">5</span>)</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a><span class="co">#&gt; # bibnets network: reference_co_citation | 7 nodes · 5 edges | counting: full </span></span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a><span class="co">#&gt;    from                            to                              weight  count</span></span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a><span class="co">#&gt; 1  HE K., ZHANG X., REN S., SUN …  SIMONYAN K., ZISSERMAN A., VE…      10     10</span></span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a><span class="co">#&gt; 2  HE K., ZHANG X., REN S., SUN …  SANDLER M., HOWARD A., ZHU M.…       8      8</span></span>
+<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a><span class="co">#&gt; 3  HAN S., MAO H., DALLY W.J., D…  SIMONYAN K., ZISSERMAN A., VE…       8      8</span></span>
+<span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a><span class="co">#&gt; 4  HE K., ZHANG X., REN S., SUN …  SIMONYAN K., ZISSERMAN A., VE…       8      8</span></span>
+<span id="cb13-9"><a href="#cb13-9" tabindex="-1"></a><span class="co">#&gt; 5  KRIZHEVSKY A., HINTON G., LEA…  SIMONYAN K., ZISSERMAN A., VE…       7      7</span></span></code></pre></div>
+<p>A similarity measure offsets the advantage of very frequently cited
+works:</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">reference_network</span>(sc, <span class="at">min_occur =</span> <span class="dv">2</span>, <span class="at">similarity =</span> <span class="st">&quot;cosine&quot;</span>), <span class="dv">3</span>)</span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a><span class="co">#&gt; # bibnets network: reference_co_citation | 6 nodes · 3 edges | counting: full | similarity: cosine </span></span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a><span class="co">#&gt;    from                            to                              weight  count</span></span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a><span class="co">#&gt; 1  ANDRI R., CAVIGELLI L., ROSSI…  CAPOTONDI A., RUSCI M., FARIS…       1      2</span></span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a><span class="co">#&gt; 2  BAI Y., ZENG B., LI C., ZHANG…  CASTELLI M., CLEMENTE F.M., P…       1      2</span></span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a><span class="co">#&gt; 3  CHEN K., ET AL., A DNN OPTIMI…  CHEN Y., ET AL., SAMBA: SINGL…       1      2</span></span></code></pre></div>
 </div>
 <div id="document-coupling-and-citation" class="section level2">
-<h2>Document Coupling and Citation</h2>
-<p>Bibliographic coupling links two documents when they share cited
-references:</p>
-<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a>coupled_docs <span class="ot">&lt;-</span> <span class="fu">document_network</span>(sc, <span class="at">type =</span> <span class="st">&quot;coupling&quot;</span>, <span class="at">similarity =</span> <span class="st">&quot;cosine&quot;</span>)</span>
-<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a><span class="fu">head</span>(coupled_docs, <span class="dv">5</span>)</span>
-<span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a><span class="co">#&gt; # bibnets network: document_coupling | 10 nodes · 5 edges | counting: full | similarity: cosine </span></span>
-<span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a><span class="co">#&gt;    from                to                  weight  count</span></span>
-<span id="cb18-5"><a href="#cb18-5" tabindex="-1"></a><span class="co">#&gt; 1  2-s2.0-85169545148  2-s2.0-85150169631  0.4671     12</span></span>
-<span id="cb18-6"><a href="#cb18-6" tabindex="-1"></a><span class="co">#&gt; 2  2-s2.0-85203687776  2-s2.0-85200587918  0.3872     10</span></span>
-<span id="cb18-7"><a href="#cb18-7" tabindex="-1"></a><span class="co">#&gt; 3  2-s2.0-85131677679  2-s2.0-85172072697  0.3424      7</span></span>
-<span id="cb18-8"><a href="#cb18-8" tabindex="-1"></a><span class="co">#&gt; 4  2-s2.0-85187392673  2-s2.0-85124224751   0.269     11</span></span>
-<span id="cb18-9"><a href="#cb18-9" tabindex="-1"></a><span class="co">#&gt; 5  2-s2.0-85161914543  2-s2.0-85100337829  0.2443     13</span></span></code></pre></div>
-<p>Direct citation is different. It keeps direction: <code>from</code>
-is the citing document and <code>to</code> is the cited document, but
-only when both documents are inside the same corpus.</p>
-<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a>direct_docs <span class="ot">&lt;-</span> <span class="fu">document_network</span>(sc, <span class="at">type =</span> <span class="st">&quot;citation&quot;</span>)</span>
-<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a><span class="fu">head</span>(direct_docs, <span class="dv">5</span>)</span>
-<span id="cb19-3"><a href="#cb19-3" tabindex="-1"></a><span class="co">#&gt; # bibnets network: document_citation | 0 nodes · 0 edges | counting: full</span></span></code></pre></div>
-<p>Many exported datasets cite external works that are not themselves
-rows in the dataset. Those external citations support co-citation and
-coupling, but they do not become direct-citation edges unless the cited
-work is also present in <code>id</code>.</p>
+<h2>Document coupling and citation</h2>
+<p>Coupling links two documents that share cited references:</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">document_network</span>(sc, <span class="at">type =</span> <span class="st">&quot;coupling&quot;</span>, <span class="at">similarity =</span> <span class="st">&quot;cosine&quot;</span>), <span class="dv">5</span>)</span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a><span class="co">#&gt; # bibnets network: document_coupling | 10 nodes · 5 edges | counting: full | similarity: cosine </span></span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a><span class="co">#&gt;    from                to                  weight  count</span></span>
+<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a><span class="co">#&gt; 1  2-s2.0-85169545148  2-s2.0-85150169631  0.4671     12</span></span>
+<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a><span class="co">#&gt; 2  2-s2.0-85203687776  2-s2.0-85200587918  0.3872     10</span></span>
+<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a><span class="co">#&gt; 3  2-s2.0-85131677679  2-s2.0-85172072697  0.3424      7</span></span>
+<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a><span class="co">#&gt; 4  2-s2.0-85187392673  2-s2.0-85124224751   0.269     11</span></span>
+<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a><span class="co">#&gt; 5  2-s2.0-85161914543  2-s2.0-85100337829  0.2443     13</span></span></code></pre></div>
+<p>Direct citation is directed — <code>from</code> cites <code>to</code>
+— and only within the corpus (the cited work must also be a row in the
+data):</p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">document_network</span>(sc, <span class="at">type =</span> <span class="st">&quot;citation&quot;</span>), <span class="dv">5</span>)</span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a><span class="co">#&gt; # bibnets network: document_citation | 0 nodes · 0 edges | counting: full</span></span></code></pre></div>
 </div>
 <div id="keyword-co-occurrence" class="section level2">
-<h2>Keyword Co-occurrence</h2>
-<p>Keyword networks are often the quickest way to inspect a corpus
-thematically:</p>
-<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a>kw <span class="ot">&lt;-</span> <span class="fu">keyword_network</span>(sc, <span class="at">min_occur =</span> <span class="dv">2</span>)</span>
-<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a><span class="fu">head</span>(kw, <span class="dv">5</span>)</span>
-<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a><span class="co">#&gt; # bibnets network: keyword_co_occurrence | 5 nodes · 5 edges | counting: full </span></span>
-<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a><span class="co">#&gt;    from            to              weight  count</span></span>
-<span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a><span class="co">#&gt; 1  EDGE COMPUTING  QUANTIZATION        16     16</span></span>
-<span id="cb20-6"><a href="#cb20-6" tabindex="-1"></a><span class="co">#&gt; 2  DEEP LEARNING   QUANTIZATION        14     14</span></span>
-<span id="cb20-7"><a href="#cb20-7" tabindex="-1"></a><span class="co">#&gt; 3  DEEP LEARNING   EDGE COMPUTING      13     13</span></span>
-<span id="cb20-8"><a href="#cb20-8" tabindex="-1"></a><span class="co">#&gt; 4  DEEP LEARNING   FPGA                10     10</span></span>
-<span id="cb20-9"><a href="#cb20-9" tabindex="-1"></a><span class="co">#&gt; 5  PRUNING         QUANTIZATION        10     10</span></span></code></pre></div>
-<p>Entity labels are trimmed and uppercased during matrix construction.
-This means that <code>machine learning</code>,
-<code>Machine Learning</code>, and <code>MACHINE LEARNING</code> resolve
-to the same node.</p>
-<p>Association strength is commonly useful for co-occurrence maps
-because it downweights pairs that are common only because both keywords
-are individually frequent:</p>
-<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a>kw_assoc <span class="ot">&lt;-</span> <span class="fu">keyword_network</span>(sc, <span class="at">min_occur =</span> <span class="dv">2</span>, <span class="at">similarity =</span> <span class="st">&quot;association&quot;</span>)</span>
-<span id="cb21-2"><a href="#cb21-2" tabindex="-1"></a><span class="fu">head</span>(kw_assoc, <span class="dv">5</span>)</span>
-<span id="cb21-3"><a href="#cb21-3" tabindex="-1"></a><span class="co">#&gt; # bibnets network: keyword_co_occurrence | 10 nodes · 5 edges | counting: full | similarity: association </span></span>
-<span id="cb21-4"><a href="#cb21-4" tabindex="-1"></a><span class="co">#&gt;    from                     to                          weight  count</span></span>
-<span id="cb21-5"><a href="#cb21-5" tabindex="-1"></a><span class="co">#&gt; 1  AIR QUALITY PREDICTION   POST-TRAINING QUANTISATION     0.5      2</span></span>
-<span id="cb21-6"><a href="#cb21-6" tabindex="-1"></a><span class="co">#&gt; 2  LFSR SEED                QUANTIZATION (SIGNAL)          0.5      2</span></span>
-<span id="cb21-7"><a href="#cb21-7" tabindex="-1"></a><span class="co">#&gt; 3  BOOTH MULTIPLIERS        SHIFT MULTIPLIERS              0.5      2</span></span>
-<span id="cb21-8"><a href="#cb21-8" tabindex="-1"></a><span class="co">#&gt; 4  FERROELECTRIC CAPACITOR  SMALL-SIGNAL ANALYSIS          0.5      2</span></span>
-<span id="cb21-9"><a href="#cb21-9" tabindex="-1"></a><span class="co">#&gt; 5  K-NEAREST NEIGHBOR       SMART LIGHTING                 0.5      2</span></span></code></pre></div>
+<h2>Keyword co-occurrence</h2>
+<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a>kw <span class="ot">&lt;-</span> <span class="fu">keyword_network</span>(sc, <span class="at">min_occur =</span> <span class="dv">2</span>)</span>
+<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a><span class="fu">head</span>(kw, <span class="dv">5</span>)</span>
+<span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a><span class="co">#&gt; # bibnets network: keyword_co_occurrence | 5 nodes · 5 edges | counting: full </span></span>
+<span id="cb17-4"><a href="#cb17-4" tabindex="-1"></a><span class="co">#&gt;    from            to              weight  count</span></span>
+<span id="cb17-5"><a href="#cb17-5" tabindex="-1"></a><span class="co">#&gt; 1  EDGE COMPUTING  QUANTIZATION        16     16</span></span>
+<span id="cb17-6"><a href="#cb17-6" tabindex="-1"></a><span class="co">#&gt; 2  DEEP LEARNING   QUANTIZATION        14     14</span></span>
+<span id="cb17-7"><a href="#cb17-7" tabindex="-1"></a><span class="co">#&gt; 3  DEEP LEARNING   EDGE COMPUTING      13     13</span></span>
+<span id="cb17-8"><a href="#cb17-8" tabindex="-1"></a><span class="co">#&gt; 4  DEEP LEARNING   FPGA                10     10</span></span>
+<span id="cb17-9"><a href="#cb17-9" tabindex="-1"></a><span class="co">#&gt; 5  PRUNING         QUANTIZATION        10     10</span></span></code></pre></div>
+<p>Labels are trimmed and upper-cased during construction, so
+<code>machine learning</code>, <code>Machine Learning</code>, and
+<code>MACHINE LEARNING</code> are one node. Association strength is a
+common choice for co-occurrence maps:</p>
+<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">keyword_network</span>(sc, <span class="at">min_occur =</span> <span class="dv">2</span>, <span class="at">similarity =</span> <span class="st">&quot;association&quot;</span>), <span class="dv">3</span>)</span>
+<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a><span class="co">#&gt; # bibnets network: keyword_co_occurrence | 6 nodes · 3 edges | counting: full | similarity: association </span></span>
+<span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a><span class="co">#&gt;    from                    to                          weight  count</span></span>
+<span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a><span class="co">#&gt; 1  AIR QUALITY PREDICTION  POST-TRAINING QUANTISATION     0.5      2</span></span>
+<span id="cb18-5"><a href="#cb18-5" tabindex="-1"></a><span class="co">#&gt; 2  LFSR SEED               QUANTIZATION (SIGNAL)          0.5      2</span></span>
+<span id="cb18-6"><a href="#cb18-6" tabindex="-1"></a><span class="co">#&gt; 3  BOOTH MULTIPLIERS       SHIFT MULTIPLIERS              0.5      2</span></span></code></pre></div>
 </div>
 <div id="countries-institutions-and-sources" class="section level2">
-<h2>Countries, Institutions, and Sources</h2>
-<p>OpenAlex-style data often contains country and institution
-list-columns:</p>
-<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>country_edges <span class="ot">&lt;-</span> <span class="fu">country_network</span>(oa, <span class="at">counting =</span> <span class="st">&quot;fractional&quot;</span>)</span>
-<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a><span class="fu">head</span>(country_edges, <span class="dv">5</span>)</span>
-<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a><span class="co">#&gt; # bibnets network: country_collaboration | 8 nodes · 5 edges | counting: fractional </span></span>
-<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a><span class="co">#&gt;    from  to  weight  count</span></span>
-<span id="cb22-5"><a href="#cb22-5" tabindex="-1"></a><span class="co">#&gt; 1  BR    CL     9.7     11</span></span>
-<span id="cb22-6"><a href="#cb22-6" tabindex="-1"></a><span class="co">#&gt; 2  CA    US     9.5     13</span></span>
-<span id="cb22-7"><a href="#cb22-7" tabindex="-1"></a><span class="co">#&gt; 3  AU    US   8.967     15</span></span>
-<span id="cb22-8"><a href="#cb22-8" tabindex="-1"></a><span class="co">#&gt; 4  DE    NL   8.311     10</span></span>
-<span id="cb22-9"><a href="#cb22-9" tabindex="-1"></a><span class="co">#&gt; 5  CN    US     8.2     11</span></span>
-<span id="cb22-10"><a href="#cb22-10" tabindex="-1"></a></span>
-<span id="cb22-11"><a href="#cb22-11" tabindex="-1"></a>inst_edges <span class="ot">&lt;-</span> <span class="fu">institution_network</span>(oa, <span class="at">counting =</span> <span class="st">&quot;fractional&quot;</span>, <span class="at">min_occur =</span> <span class="dv">2</span>)</span>
-<span id="cb22-12"><a href="#cb22-12" tabindex="-1"></a><span class="fu">head</span>(inst_edges, <span class="dv">5</span>)</span>
-<span id="cb22-13"><a href="#cb22-13" tabindex="-1"></a><span class="co">#&gt; # bibnets network: institution_collaboration | 10 nodes · 5 edges | counting: fractional </span></span>
-<span id="cb22-14"><a href="#cb22-14" tabindex="-1"></a><span class="co">#&gt;    from                            to                             weight  count</span></span>
-<span id="cb22-15"><a href="#cb22-15" tabindex="-1"></a><span class="co">#&gt; 1  FINLAND UNIVERSITY              UNIVERSITY OF EASTERN FINLAND   5.778     13</span></span>
-<span id="cb22-16"><a href="#cb22-16" tabindex="-1"></a><span class="co">#&gt; 2  MAASTRICHT SCHOOL OF MANAGEME…  MAASTRICHT UNIVERSITY           4.833      6</span></span>
-<span id="cb22-17"><a href="#cb22-17" tabindex="-1"></a><span class="co">#&gt; 3  ESCUELA SUPERIOR POLITECNICA …  MONASH UNIVERSITY               4.667      6</span></span>
-<span id="cb22-18"><a href="#cb22-18" tabindex="-1"></a><span class="co">#&gt; 4  UNIVERSIDADE FEDERAL DE SANTA…  UNIVERSITY OF VALPARAÍSO       4.417     10</span></span>
-<span id="cb22-19"><a href="#cb22-19" tabindex="-1"></a><span class="co">#&gt; 5  KUMAMOTO UNIVERSITY             KYUSHU UNIVERSITY                   4      4</span></span></code></pre></div>
-<p>Source networks use <code>journal</code> as the entity field.
-Coupling links sources that cite the same references:</p>
-<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a>source_edges <span class="ot">&lt;-</span> <span class="fu">source_network</span>(sc, <span class="at">type =</span> <span class="st">&quot;coupling&quot;</span>, <span class="at">min_occur =</span> <span class="dv">2</span>)</span>
-<span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a><span class="fu">head</span>(source_edges, <span class="dv">5</span>)</span>
-<span id="cb23-3"><a href="#cb23-3" tabindex="-1"></a><span class="co">#&gt; # bibnets network: source_coupling | 5 nodes · 5 edges | counting: full </span></span>
-<span id="cb23-4"><a href="#cb23-4" tabindex="-1"></a><span class="co">#&gt;    from                            to                              weight  count</span></span>
-<span id="cb23-5"><a href="#cb23-5" tabindex="-1"></a><span class="co">#&gt; 1  IEEE TRANSACTIONS ON CIRCUITS…  IEEE TRANSACTIONS ON COMPUTER…      48     48</span></span>
-<span id="cb23-6"><a href="#cb23-6" tabindex="-1"></a><span class="co">#&gt; 2  IEEE TRANSACTIONS ON CIRCUITS…  PROCEEDINGS OF THE IEEE             40     40</span></span>
-<span id="cb23-7"><a href="#cb23-7" tabindex="-1"></a><span class="co">#&gt; 3  IEEE TRANSACTIONS ON CIRCUITS…  IEEE TRANSACTIONS ON VERY LAR…      39     39</span></span>
-<span id="cb23-8"><a href="#cb23-8" tabindex="-1"></a><span class="co">#&gt; 4  IEEE JOURNAL OF SOLID-STATE C…  IEEE TRANSACTIONS ON CIRCUITS…      31     31</span></span>
-<span id="cb23-9"><a href="#cb23-9" tabindex="-1"></a><span class="co">#&gt; 5  IEEE TRANSACTIONS ON COMPUTER…  IEEE TRANSACTIONS ON VERY LAR…      29     29</span></span></code></pre></div>
-<p>For source, country, institution, and author coupling,
-<code>min_occur</code> is applied to the aggregated entity before
-building the coupling network.</p>
+<h2>Countries, institutions, and sources</h2>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">country_network</span>(oa, <span class="at">counting =</span> <span class="st">&quot;fractional&quot;</span>), <span class="dv">5</span>)</span>
+<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a><span class="co">#&gt; # bibnets network: country_collaboration | 8 nodes · 5 edges | counting: fractional </span></span>
+<span id="cb19-3"><a href="#cb19-3" tabindex="-1"></a><span class="co">#&gt;    from  to  weight  count</span></span>
+<span id="cb19-4"><a href="#cb19-4" tabindex="-1"></a><span class="co">#&gt; 1  BR    CL     9.7     11</span></span>
+<span id="cb19-5"><a href="#cb19-5" tabindex="-1"></a><span class="co">#&gt; 2  CA    US     9.5     13</span></span>
+<span id="cb19-6"><a href="#cb19-6" tabindex="-1"></a><span class="co">#&gt; 3  AU    US   8.967     15</span></span>
+<span id="cb19-7"><a href="#cb19-7" tabindex="-1"></a><span class="co">#&gt; 4  DE    NL   8.311     10</span></span>
+<span id="cb19-8"><a href="#cb19-8" tabindex="-1"></a><span class="co">#&gt; 5  CN    US     8.2     11</span></span>
+<span id="cb19-9"><a href="#cb19-9" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">institution_network</span>(oa, <span class="at">counting =</span> <span class="st">&quot;fractional&quot;</span>, <span class="at">min_occur =</span> <span class="dv">2</span>), <span class="dv">5</span>)</span>
+<span id="cb19-10"><a href="#cb19-10" tabindex="-1"></a><span class="co">#&gt; # bibnets network: institution_collaboration | 10 nodes · 5 edges | counting: fractional </span></span>
+<span id="cb19-11"><a href="#cb19-11" tabindex="-1"></a><span class="co">#&gt;    from                            to                             weight  count</span></span>
+<span id="cb19-12"><a href="#cb19-12" tabindex="-1"></a><span class="co">#&gt; 1  FINLAND UNIVERSITY              UNIVERSITY OF EASTERN FINLAND   5.778     13</span></span>
+<span id="cb19-13"><a href="#cb19-13" tabindex="-1"></a><span class="co">#&gt; 2  MAASTRICHT SCHOOL OF MANAGEME…  MAASTRICHT UNIVERSITY           4.833      6</span></span>
+<span id="cb19-14"><a href="#cb19-14" tabindex="-1"></a><span class="co">#&gt; 3  ESCUELA SUPERIOR POLITECNICA …  MONASH UNIVERSITY               4.667      6</span></span>
+<span id="cb19-15"><a href="#cb19-15" tabindex="-1"></a><span class="co">#&gt; 4  UNIVERSIDADE FEDERAL DE SANTA…  UNIVERSITY OF VALPARAÍSO       4.417     10</span></span>
+<span id="cb19-16"><a href="#cb19-16" tabindex="-1"></a><span class="co">#&gt; 5  KUMAMOTO UNIVERSITY             KYUSHU UNIVERSITY                   4      4</span></span>
+<span id="cb19-17"><a href="#cb19-17" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">source_network</span>(sc, <span class="at">type =</span> <span class="st">&quot;coupling&quot;</span>, <span class="at">min_occur =</span> <span class="dv">2</span>), <span class="dv">5</span>)</span>
+<span id="cb19-18"><a href="#cb19-18" tabindex="-1"></a><span class="co">#&gt; # bibnets network: source_coupling | 5 nodes · 5 edges | counting: full </span></span>
+<span id="cb19-19"><a href="#cb19-19" tabindex="-1"></a><span class="co">#&gt;    from                            to                              weight  count</span></span>
+<span id="cb19-20"><a href="#cb19-20" tabindex="-1"></a><span class="co">#&gt; 1  IEEE TRANSACTIONS ON CIRCUITS…  IEEE TRANSACTIONS ON COMPUTER…      48     48</span></span>
+<span id="cb19-21"><a href="#cb19-21" tabindex="-1"></a><span class="co">#&gt; 2  IEEE TRANSACTIONS ON CIRCUITS…  PROCEEDINGS OF THE IEEE             40     40</span></span>
+<span id="cb19-22"><a href="#cb19-22" tabindex="-1"></a><span class="co">#&gt; 3  IEEE TRANSACTIONS ON CIRCUITS…  IEEE TRANSACTIONS ON VERY LAR…      39     39</span></span>
+<span id="cb19-23"><a href="#cb19-23" tabindex="-1"></a><span class="co">#&gt; 4  IEEE JOURNAL OF SOLID-STATE C…  IEEE TRANSACTIONS ON CIRCUITS…      31     31</span></span>
+<span id="cb19-24"><a href="#cb19-24" tabindex="-1"></a><span class="co">#&gt; 5  IEEE TRANSACTIONS ON COMPUTER…  IEEE TRANSACTIONS ON VERY LAR…      29     29</span></span></code></pre></div>
+<p>For coupling networks, <code>min_occur</code> is applied to the
+aggregated entity before the network is built.</p>
 </div>
 <div id="generic-co-networks" class="section level2">
-<h2>Generic Co-networks</h2>
-<p>Use <code>conetwork()</code> when you want a projection not covered
-by a dedicated helper.</p>
-<p>One-field use:</p>
-<div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">conetwork</span>(sc, <span class="st">&quot;keywords&quot;</span>, <span class="at">min_occur =</span> <span class="dv">2</span>), <span class="dv">5</span>)</span>
-<span id="cb24-2"><a href="#cb24-2" tabindex="-1"></a><span class="co">#&gt; # bibnets network: keywords_co_occurrence | 5 nodes · 5 edges | counting: full </span></span>
-<span id="cb24-3"><a href="#cb24-3" tabindex="-1"></a><span class="co">#&gt;    from            to              weight  count</span></span>
-<span id="cb24-4"><a href="#cb24-4" tabindex="-1"></a><span class="co">#&gt; 1  EDGE COMPUTING  QUANTIZATION        16     16</span></span>
-<span id="cb24-5"><a href="#cb24-5" tabindex="-1"></a><span class="co">#&gt; 2  DEEP LEARNING   QUANTIZATION        14     14</span></span>
-<span id="cb24-6"><a href="#cb24-6" tabindex="-1"></a><span class="co">#&gt; 3  DEEP LEARNING   EDGE COMPUTING      13     13</span></span>
-<span id="cb24-7"><a href="#cb24-7" tabindex="-1"></a><span class="co">#&gt; 4  DEEP LEARNING   FPGA                10     10</span></span>
-<span id="cb24-8"><a href="#cb24-8" tabindex="-1"></a><span class="co">#&gt; 5  PRUNING         QUANTIZATION        10     10</span></span></code></pre></div>
-<p>Two-field use:</p>
-<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">conetwork</span>(sc, <span class="st">&quot;authors&quot;</span>, <span class="at">by =</span> <span class="st">&quot;keywords&quot;</span>, <span class="at">min_occur =</span> <span class="dv">2</span>), <span class="dv">5</span>)</span>
-<span id="cb25-2"><a href="#cb25-2" tabindex="-1"></a><span class="co">#&gt; # bibnets network: authors_by_keywords | 7 nodes · 5 edges | counting: full </span></span>
-<span id="cb25-3"><a href="#cb25-3" tabindex="-1"></a><span class="co">#&gt;    from               to                 weight  count</span></span>
-<span id="cb25-4"><a href="#cb25-4" tabindex="-1"></a><span class="co">#&gt; 1  CAI H              LIU B                  36     36</span></span>
-<span id="cb25-5"><a href="#cb25-5" tabindex="-1"></a><span class="co">#&gt; 2  WANG Y             YIN S                  30     30</span></span>
-<span id="cb25-6"><a href="#cb25-6" tabindex="-1"></a><span class="co">#&gt; 3  AMROUCH H          ANAGNOSTOPOULOS I      24     24</span></span>
-<span id="cb25-7"><a href="#cb25-7" tabindex="-1"></a><span class="co">#&gt; 4  AMROUCH H          HENKEL J               24     24</span></span>
-<span id="cb25-8"><a href="#cb25-8" tabindex="-1"></a><span class="co">#&gt; 5  ANAGNOSTOPOULOS I  HENKEL J               24     24</span></span></code></pre></div>
-<p>The second example links authors through shared keywords. This is not
-a co-authorship network; it is a thematic-similarity network between
-authors.</p>
-<p>Delimited character columns are split automatically:</p>
-<div class="sourceCode" id="cb26"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" tabindex="-1"></a>toy <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
-<span id="cb26-2"><a href="#cb26-2" tabindex="-1"></a>  <span class="at">id =</span> <span class="fu">c</span>(<span class="st">&quot;P1&quot;</span>, <span class="st">&quot;P2&quot;</span>, <span class="st">&quot;P3&quot;</span>),</span>
-<span id="cb26-3"><a href="#cb26-3" tabindex="-1"></a>  <span class="at">tags =</span> <span class="fu">c</span>(<span class="st">&quot;methods; networks&quot;</span>, <span class="st">&quot;networks; R&quot;</span>, <span class="st">&quot;methods; R&quot;</span>)</span>
-<span id="cb26-4"><a href="#cb26-4" tabindex="-1"></a>)</span>
-<span id="cb26-5"><a href="#cb26-5" tabindex="-1"></a></span>
-<span id="cb26-6"><a href="#cb26-6" tabindex="-1"></a><span class="fu">conetwork</span>(toy, <span class="st">&quot;tags&quot;</span>)</span>
-<span id="cb26-7"><a href="#cb26-7" tabindex="-1"></a><span class="co">#&gt; # bibnets network: tags_co_occurrence | 3 nodes · 3 edges | counting: full </span></span>
-<span id="cb26-8"><a href="#cb26-8" tabindex="-1"></a><span class="co">#&gt;    from      to        weight  count</span></span>
-<span id="cb26-9"><a href="#cb26-9" tabindex="-1"></a><span class="co">#&gt; 1  METHODS   NETWORKS       1      1</span></span>
-<span id="cb26-10"><a href="#cb26-10" tabindex="-1"></a><span class="co">#&gt; 2  METHODS   R              1      1</span></span>
-<span id="cb26-11"><a href="#cb26-11" tabindex="-1"></a><span class="co">#&gt; 3  NETWORKS  R              1      1</span></span></code></pre></div>
+<h2>Generic co-networks</h2>
+<p><code>conetwork()</code> covers projections without a dedicated
+wrapper. One field links entities that co-occur; a second field
+(<code>by</code>) links them through a shared value:</p>
+<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">conetwork</span>(sc, <span class="st">&quot;keywords&quot;</span>, <span class="at">min_occur =</span> <span class="dv">2</span>), <span class="dv">3</span>)</span>
+<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a><span class="co">#&gt; # bibnets network: keywords_co_occurrence | 3 nodes · 3 edges | counting: full </span></span>
+<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a><span class="co">#&gt;    from            to              weight  count</span></span>
+<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a><span class="co">#&gt; 1  EDGE COMPUTING  QUANTIZATION        16     16</span></span>
+<span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a><span class="co">#&gt; 2  DEEP LEARNING   QUANTIZATION        14     14</span></span>
+<span id="cb20-6"><a href="#cb20-6" tabindex="-1"></a><span class="co">#&gt; 3  DEEP LEARNING   EDGE COMPUTING      13     13</span></span>
+<span id="cb20-7"><a href="#cb20-7" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">conetwork</span>(sc, <span class="st">&quot;authors&quot;</span>, <span class="at">by =</span> <span class="st">&quot;keywords&quot;</span>, <span class="at">min_occur =</span> <span class="dv">2</span>), <span class="dv">3</span>)</span>
+<span id="cb20-8"><a href="#cb20-8" tabindex="-1"></a><span class="co">#&gt; # bibnets network: authors_by_keywords | 6 nodes · 3 edges | counting: full </span></span>
+<span id="cb20-9"><a href="#cb20-9" tabindex="-1"></a><span class="co">#&gt;    from       to                 weight  count</span></span>
+<span id="cb20-10"><a href="#cb20-10" tabindex="-1"></a><span class="co">#&gt; 1  CAI H      LIU B                  36     36</span></span>
+<span id="cb20-11"><a href="#cb20-11" tabindex="-1"></a><span class="co">#&gt; 2  WANG Y     YIN S                  30     30</span></span>
+<span id="cb20-12"><a href="#cb20-12" tabindex="-1"></a><span class="co">#&gt; 3  AMROUCH H  ANAGNOSTOPOULOS I      24     24</span></span></code></pre></div>
+<p>The second result links authors through shared keywords — a thematic
+similarity network, not a co-authorship one.</p>
 </div>
 <div id="normalization" class="section level2">
 <h2>Normalization</h2>
-<p>The same raw counts can support different similarity scores:</p>
-<div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" tabindex="-1"></a>none <span class="ot">&lt;-</span> <span class="fu">keyword_network</span>(sc, <span class="at">min_occur =</span> <span class="dv">2</span>, <span class="at">similarity =</span> <span class="st">&quot;none&quot;</span>)</span>
-<span id="cb27-2"><a href="#cb27-2" tabindex="-1"></a>cos  <span class="ot">&lt;-</span> <span class="fu">keyword_network</span>(sc, <span class="at">min_occur =</span> <span class="dv">2</span>, <span class="at">similarity =</span> <span class="st">&quot;cosine&quot;</span>)</span>
-<span id="cb27-3"><a href="#cb27-3" tabindex="-1"></a></span>
-<span id="cb27-4"><a href="#cb27-4" tabindex="-1"></a><span class="fu">head</span>(none[, <span class="fu">c</span>(<span class="st">&quot;from&quot;</span>, <span class="st">&quot;to&quot;</span>, <span class="st">&quot;weight&quot;</span>, <span class="st">&quot;count&quot;</span>)], <span class="dv">3</span>)</span>
-<span id="cb27-5"><a href="#cb27-5" tabindex="-1"></a><span class="co">#&gt; # bibnets network: unknown | 3 nodes · 3 edges </span></span>
-<span id="cb27-6"><a href="#cb27-6" tabindex="-1"></a><span class="co">#&gt;    from            to              weight  count</span></span>
-<span id="cb27-7"><a href="#cb27-7" tabindex="-1"></a><span class="co">#&gt; 1  EDGE COMPUTING  QUANTIZATION        16     16</span></span>
-<span id="cb27-8"><a href="#cb27-8" tabindex="-1"></a><span class="co">#&gt; 2  DEEP LEARNING   QUANTIZATION        14     14</span></span>
-<span id="cb27-9"><a href="#cb27-9" tabindex="-1"></a><span class="co">#&gt; 3  DEEP LEARNING   EDGE COMPUTING      13     13</span></span>
-<span id="cb27-10"><a href="#cb27-10" tabindex="-1"></a><span class="fu">head</span>(cos[, <span class="fu">c</span>(<span class="st">&quot;from&quot;</span>, <span class="st">&quot;to&quot;</span>, <span class="st">&quot;weight&quot;</span>, <span class="st">&quot;count&quot;</span>)], <span class="dv">3</span>)</span>
-<span id="cb27-11"><a href="#cb27-11" tabindex="-1"></a><span class="co">#&gt; # bibnets network: unknown | 6 nodes · 3 edges </span></span>
-<span id="cb27-12"><a href="#cb27-12" tabindex="-1"></a><span class="co">#&gt;    from                    to                          weight  count</span></span>
-<span id="cb27-13"><a href="#cb27-13" tabindex="-1"></a><span class="co">#&gt; 1  AIR QUALITY PREDICTION  POST-TRAINING QUANTISATION       1      2</span></span>
-<span id="cb27-14"><a href="#cb27-14" tabindex="-1"></a><span class="co">#&gt; 2  LFSR SEED               QUANTIZATION (SIGNAL)            1      2</span></span>
-<span id="cb27-15"><a href="#cb27-15" tabindex="-1"></a><span class="co">#&gt; 3  BOOTH MULTIPLIERS       SHIFT MULTIPLIERS                1      2</span></span></code></pre></div>
-<p>Notice that <code>count</code> is unchanged. The <code>weight</code>
-column changes because normalization is applied after raw co-occurrence
-has been counted.</p>
-<p>Available methods are:</p>
-<div class="sourceCode" id="cb28"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" tabindex="-1"></a><span class="fu">normalize</span>(<span class="fu">to_matrix</span>(<span class="fu">keyword_network</span>(small)), <span class="st">&quot;cosine&quot;</span>)</span>
-<span id="cb28-2"><a href="#cb28-2" tabindex="-1"></a><span class="co">#&gt; 23 x 23 sparse Matrix of class &quot;dsCMatrix&quot;</span></span>
-<span id="cb28-3"><a href="#cb28-3" tabindex="-1"></a><span class="co">#&gt;   [[ suppressing 23 column names &#39;AUTHOR NAMES&#39;, &#39;BIBLIOMETRICS&#39;, &#39;CITATION NETWORKS&#39; ... ]]</span></span>
-<span id="cb28-4"><a href="#cb28-4" tabindex="-1"></a><span class="co">#&gt;                                                                      </span></span>
-<span id="cb28-5"><a href="#cb28-5" tabindex="-1"></a><span class="co">#&gt; AUTHOR NAMES            . . . . . . . . . . 1 . 1 . . . . . . . . . .</span></span>
-<span id="cb28-6"><a href="#cb28-6" tabindex="-1"></a><span class="co">#&gt; BIBLIOMETRICS           . . . . . . 1 1 . 1 . . . 1 1 1 1 1 1 . 1 . .</span></span>
-<span id="cb28-7"><a href="#cb28-7" tabindex="-1"></a><span class="co">#&gt; CITATION NETWORKS       . . . . 1 . . . 1 . . . . . . . . . . . . . .</span></span>
-<span id="cb28-8"><a href="#cb28-8" tabindex="-1"></a><span class="co">#&gt; CITATION PATTERNS       . . . . . . . . . . . 1 . . . . . . . . . . 1</span></span>
-<span id="cb28-9"><a href="#cb28-9" tabindex="-1"></a><span class="co">#&gt; CLUSTERING              . . 1 . . . . . 1 . . . . . . . . . . . . . .</span></span>
-<span id="cb28-10"><a href="#cb28-10" tabindex="-1"></a><span class="co">#&gt; CO-AUTHORSHIP           . . . . . . . . . . . . . . . . 1 . . 1 . . .</span></span>
-<span id="cb28-11"><a href="#cb28-11" tabindex="-1"></a><span class="co">#&gt; CO-CITATION             . 1 . . . . . . . . . . . . . . 1 . . . . . .</span></span>
-<span id="cb28-12"><a href="#cb28-12" tabindex="-1"></a><span class="co">#&gt; CO-OCCURRENCE           . 1 . . . . . . . . . . . . 1 . . 1 . . . 1 .</span></span>
-<span id="cb28-13"><a href="#cb28-13" tabindex="-1"></a><span class="co">#&gt; COMMUNITY DETECTION     . . 1 . 1 . . . . . . . . . . . . . . . . . .</span></span>
-<span id="cb28-14"><a href="#cb28-14" tabindex="-1"></a><span class="co">#&gt; COUPLING                . 1 . . . . . . . . . . . . . . . . 1 . . . .</span></span>
-<span id="cb28-15"><a href="#cb28-15" tabindex="-1"></a><span class="co">#&gt; DISAMBIGUATION          1 . . . . . . . . . . . 1 . . . . . . . . . .</span></span>
-<span id="cb28-16"><a href="#cb28-16" tabindex="-1"></a><span class="co">#&gt; DYNAMICS                . . . 1 . . . . . . . . . . . . . . . . . . 1</span></span>
-<span id="cb28-17"><a href="#cb28-17" tabindex="-1"></a><span class="co">#&gt; ENTITY RESOLUTION       1 . . . . . . . . . 1 . . . . . . . . . . . .</span></span>
-<span id="cb28-18"><a href="#cb28-18" tabindex="-1"></a><span class="co">#&gt; FRACTIONAL COUNTING     . 1 . . . . . . . . . . . . . . . 1 . . . . .</span></span>
-<span id="cb28-19"><a href="#cb28-19" tabindex="-1"></a><span class="co">#&gt; KEYWORD MAPPING         . 1 . . . . . 1 . . . . . . . . . . . . . . .</span></span>
-<span id="cb28-20"><a href="#cb28-20" tabindex="-1"></a><span class="co">#&gt; KNOWLEDGE DOMAINS       . 1 . . . . . . . . . . . . . . . . . . 1 . .</span></span>
-<span id="cb28-21"><a href="#cb28-21" tabindex="-1"></a><span class="co">#&gt; NETWORK ANALYSIS        . 1 . . . 1 1 . . . . . . . . . . . . 1 . . .</span></span>
-<span id="cb28-22"><a href="#cb28-22" tabindex="-1"></a><span class="co">#&gt; NORMALIZATION           . 1 . . . . . 1 . . . . . 1 . . . . . . . 1 .</span></span>
-<span id="cb28-23"><a href="#cb28-23" tabindex="-1"></a><span class="co">#&gt; RESEARCH FRONTS         . 1 . . . . . . . 1 . . . . . . . . . . . . .</span></span>
-<span id="cb28-24"><a href="#cb28-24" tabindex="-1"></a><span class="co">#&gt; SCHOLARLY COMMUNICATION . . . . . 1 . . . . . . . . . . 1 . . . . . .</span></span>
-<span id="cb28-25"><a href="#cb28-25" tabindex="-1"></a><span class="co">#&gt; SCIENCE MAPPING         . 1 . . . . . . . . . . . . . 1 . . . . . . .</span></span>
-<span id="cb28-26"><a href="#cb28-26" tabindex="-1"></a><span class="co">#&gt; SIMILARITY MEASURES     . . . . . . . 1 . . . . . . . . . 1 . . . . .</span></span>
-<span id="cb28-27"><a href="#cb28-27" tabindex="-1"></a><span class="co">#&gt; TEMPORAL ANALYSIS       . . . 1 . . . . . . . 1 . . . . . . . . . . .</span></span></code></pre></div>
-<p>In practice:</p>
-<ul>
-<li>Use <code>similarity = &quot;none&quot;</code> for raw weighted counts.</li>
-<li>Use <code>similarity = &quot;cosine&quot;</code> for interpretable overlap
-scaled by marginal size.</li>
-<li>Use <code>similarity = &quot;association&quot;</code> when the goal is to
-emphasize pairs that co-occur more than expected from their individual
-frequencies.</li>
-<li>Use <code>jaccard</code>, <code>inclusion</code>, or
-<code>equivalence</code> when those coefficients match a downstream
-method or established reporting convention.</li>
-</ul>
+<p>The same raw counts support different similarity scores; only
+<code>weight</code> changes, <code>count</code> does not:</p>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a>none <span class="ot">&lt;-</span> <span class="fu">keyword_network</span>(sc, <span class="at">min_occur =</span> <span class="dv">2</span>, <span class="at">similarity =</span> <span class="st">&quot;none&quot;</span>)</span>
+<span id="cb21-2"><a href="#cb21-2" tabindex="-1"></a>cos  <span class="ot">&lt;-</span> <span class="fu">keyword_network</span>(sc, <span class="at">min_occur =</span> <span class="dv">2</span>, <span class="at">similarity =</span> <span class="st">&quot;cosine&quot;</span>)</span>
+<span id="cb21-3"><a href="#cb21-3" tabindex="-1"></a><span class="fu">head</span>(none[, <span class="fu">c</span>(<span class="st">&quot;from&quot;</span>, <span class="st">&quot;to&quot;</span>, <span class="st">&quot;weight&quot;</span>, <span class="st">&quot;count&quot;</span>)], <span class="dv">3</span>)</span>
+<span id="cb21-4"><a href="#cb21-4" tabindex="-1"></a><span class="co">#&gt; # bibnets network: unknown | 3 nodes · 3 edges </span></span>
+<span id="cb21-5"><a href="#cb21-5" tabindex="-1"></a><span class="co">#&gt;    from            to              weight  count</span></span>
+<span id="cb21-6"><a href="#cb21-6" tabindex="-1"></a><span class="co">#&gt; 1  EDGE COMPUTING  QUANTIZATION        16     16</span></span>
+<span id="cb21-7"><a href="#cb21-7" tabindex="-1"></a><span class="co">#&gt; 2  DEEP LEARNING   QUANTIZATION        14     14</span></span>
+<span id="cb21-8"><a href="#cb21-8" tabindex="-1"></a><span class="co">#&gt; 3  DEEP LEARNING   EDGE COMPUTING      13     13</span></span>
+<span id="cb21-9"><a href="#cb21-9" tabindex="-1"></a><span class="fu">head</span>(cos[,  <span class="fu">c</span>(<span class="st">&quot;from&quot;</span>, <span class="st">&quot;to&quot;</span>, <span class="st">&quot;weight&quot;</span>, <span class="st">&quot;count&quot;</span>)], <span class="dv">3</span>)</span>
+<span id="cb21-10"><a href="#cb21-10" tabindex="-1"></a><span class="co">#&gt; # bibnets network: unknown | 6 nodes · 3 edges </span></span>
+<span id="cb21-11"><a href="#cb21-11" tabindex="-1"></a><span class="co">#&gt;    from                    to                          weight  count</span></span>
+<span id="cb21-12"><a href="#cb21-12" tabindex="-1"></a><span class="co">#&gt; 1  AIR QUALITY PREDICTION  POST-TRAINING QUANTISATION       1      2</span></span>
+<span id="cb21-13"><a href="#cb21-13" tabindex="-1"></a><span class="co">#&gt; 2  LFSR SEED               QUANTIZATION (SIGNAL)            1      2</span></span>
+<span id="cb21-14"><a href="#cb21-14" tabindex="-1"></a><span class="co">#&gt; 3  BOOTH MULTIPLIERS       SHIFT MULTIPLIERS                1      2</span></span></code></pre></div>
+<p><code>normalize()</code> uses the diagonal of the projected matrix as
+each node’s total occurrence count:</p>
+<table>
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Similarity</th>
+<th>Denominator</th>
+<th>Meaning</th>
+<th>When to use</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>&quot;none&quot;</code></td>
+<td>No denominator; the projected matrix is returned as raw weighted
+co-occurrence, with the diagonal removed by the network builder unless
+self-loops are requested.</td>
+<td><code>weight</code> stays on the same scale as the counted
+projection.</td>
+<td>Use when absolute co-occurrence or counted edge strength is the
+quantity of interest.</td>
+</tr>
+<tr class="even">
+<td><code>&quot;cosine&quot;</code></td>
+<td>Square root of the product of the two node totals.</td>
+<td>Symmetric size correction; pairs are high when their overlap is
+large relative to both nodes’ frequencies.</td>
+<td>Use as a general-purpose correction for very frequent nodes while
+preserving a familiar similarity scale.</td>
+</tr>
+<tr class="odd">
+<td><code>&quot;association&quot;</code></td>
+<td>Product of the two node totals.</td>
+<td>Symmetric association-strength normalization; strongly penalizes
+pairs involving very frequent nodes.</td>
+<td>Use for co-occurrence maps where you want rare, unexpectedly tight
+pairings to stand out.</td>
+</tr>
+<tr class="even">
+<td><code>&quot;jaccard&quot;</code></td>
+<td>Sum of the two node totals minus their observed edge value.</td>
+<td>Symmetric overlap over a union-like total.</td>
+<td>Use when the edge should represent shared occurrence as a share of
+either node’s combined footprint.</td>
+</tr>
+<tr class="odd">
+<td><code>&quot;inclusion&quot;</code></td>
+<td>The smaller of the two node totals.</td>
+<td>Symmetric containment-oriented score; it reaches high values when
+the smaller node mostly appears with the larger one.</td>
+<td>Use when subset or specialization relationships are more important
+than balanced overlap.</td>
+</tr>
+<tr class="even">
+<td><code>&quot;equivalence&quot;</code></td>
+<td>Product of the two node totals, with the edge value squared before
+division.</td>
+<td>Cosine-like normalization with stronger penalty for weak or
+occasional overlap.</td>
+<td>Use when following equivalence-index conventions or when only
+consistently paired nodes should remain strong.</td>
+</tr>
+</tbody>
+</table>
 </div>
 <div id="reducing-large-networks" class="section level2">
-<h2>Reducing Large Networks</h2>
-<p>Dense co-occurrence networks can be hard to inspect.
-<code>bibnets</code> provides three different reduction strategies.</p>
-<div class="sourceCode" id="cb29"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" tabindex="-1"></a>edges <span class="ot">&lt;-</span> <span class="fu">author_network</span>(oa, <span class="st">&quot;collaboration&quot;</span>)</span>
-<span id="cb29-2"><a href="#cb29-2" tabindex="-1"></a></span>
-<span id="cb29-3"><a href="#cb29-3" tabindex="-1"></a><span class="fu">nrow</span>(edges)</span>
-<span id="cb29-4"><a href="#cb29-4" tabindex="-1"></a><span class="co">#&gt; [1] 12270</span></span>
-<span id="cb29-5"><a href="#cb29-5" tabindex="-1"></a><span class="fu">nrow</span>(<span class="fu">prune</span>(edges, <span class="at">threshold =</span> <span class="dv">2</span>))</span>
-<span id="cb29-6"><a href="#cb29-6" tabindex="-1"></a><span class="co">#&gt; [1] 779</span></span>
-<span id="cb29-7"><a href="#cb29-7" tabindex="-1"></a><span class="fu">nrow</span>(<span class="fu">prune</span>(edges, <span class="at">top_n =</span> <span class="dv">5</span>))</span>
-<span id="cb29-8"><a href="#cb29-8" tabindex="-1"></a><span class="co">#&gt; [1] 12188</span></span>
-<span id="cb29-9"><a href="#cb29-9" tabindex="-1"></a><span class="fu">nrow</span>(<span class="fu">filter_top</span>(edges, <span class="at">n =</span> <span class="dv">50</span>))</span>
-<span id="cb29-10"><a href="#cb29-10" tabindex="-1"></a><span class="co">#&gt; [1] 956</span></span></code></pre></div>
-<p><code>prune(threshold = x)</code> keeps edges with weight at least
-<code>x</code>. <code>prune(top_n = k)</code> keeps locally strong edges
-for each endpoint. <code>filter_top(n = k)</code> first selects the most
-connected nodes, then keeps edges among them.</p>
-<p><code>backbone()</code> applies the disparity filter for multiscale
-weighted networks:</p>
-<div class="sourceCode" id="cb30"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" tabindex="-1"></a>bb <span class="ot">&lt;-</span> <span class="fu">backbone</span>(edges, <span class="at">alpha =</span> <span class="fl">0.05</span>)</span>
-<span id="cb30-2"><a href="#cb30-2" tabindex="-1"></a><span class="fu">nrow</span>(bb)</span>
-<span id="cb30-3"><a href="#cb30-3" tabindex="-1"></a><span class="co">#&gt; [1] 232</span></span>
-<span id="cb30-4"><a href="#cb30-4" tabindex="-1"></a><span class="fu">head</span>(bb, <span class="dv">5</span>)</span>
-<span id="cb30-5"><a href="#cb30-5" tabindex="-1"></a><span class="co">#&gt; # bibnets network: author_collaboration | 9 nodes · 5 edges | counting: full </span></span>
-<span id="cb30-6"><a href="#cb30-6" tabindex="-1"></a><span class="co">#&gt;    from                        to                          weight  count</span></span>
-<span id="cb30-7"><a href="#cb30-7" tabindex="-1"></a><span class="co">#&gt; 1  MOHAMMED SAQR               SONSOLES LÓPEZ‐PERNAS        19     19</span></span>
-<span id="cb30-8"><a href="#cb30-8" tabindex="-1"></a><span class="co">#&gt; 2  CRISTIAN CECHINEL           ROBERTO MUÑOZ                  11     11</span></span>
-<span id="cb30-9"><a href="#cb30-9" tabindex="-1"></a><span class="co">#&gt; 3  DRAGAN GAŠEVIĆ            ROBERTO MARTÍNEZ‐MALDONADO      10     10</span></span>
-<span id="cb30-10"><a href="#cb30-10" tabindex="-1"></a><span class="co">#&gt; 4  ROBERTO MARTÍNEZ‐MALDONADO  VANESSA ECHEVERRÍA             10     10</span></span>
-<span id="cb30-11"><a href="#cb30-11" tabindex="-1"></a><span class="co">#&gt; 5  FERNANDA PIRES              MARCELA PESSOA                   8      8</span></span></code></pre></div>
-<p>The disparity filter asks whether an edge is unusually strong
-relative to at least one endpoint’s local strength distribution. This is
-different from a global weight cutoff and can preserve meaningful edges
-attached to smaller nodes.</p>
+<h2>Reducing large networks</h2>
+<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>edges <span class="ot">&lt;-</span> <span class="fu">author_network</span>(oa, <span class="at">type =</span> <span class="st">&quot;collaboration&quot;</span>)</span>
+<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a><span class="fu">c</span>(<span class="at">all        =</span> <span class="fu">nrow</span>(edges),</span>
+<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a>  <span class="at">threshold  =</span> <span class="fu">nrow</span>(<span class="fu">prune</span>(edges, <span class="at">threshold =</span> <span class="dv">2</span>)),</span>
+<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a>  <span class="at">top_n      =</span> <span class="fu">nrow</span>(<span class="fu">prune</span>(edges, <span class="at">top_n =</span> <span class="dv">5</span>)),</span>
+<span id="cb22-5"><a href="#cb22-5" tabindex="-1"></a>  <span class="at">top_nodes  =</span> <span class="fu">nrow</span>(<span class="fu">filter_top</span>(edges, <span class="at">n =</span> <span class="dv">50</span>)))</span>
+<span id="cb22-6"><a href="#cb22-6" tabindex="-1"></a><span class="co">#&gt;       all threshold     top_n top_nodes </span></span>
+<span id="cb22-7"><a href="#cb22-7" tabindex="-1"></a><span class="co">#&gt;     12270       779     12188       956</span></span></code></pre></div>
+<ul>
+<li><code>prune(threshold = x)</code> — absolute edge-weight
+cutoff.</li>
+<li><code>prune(top_n = k)</code> — keep each node’s strongest
+edges.</li>
+<li><code>filter_top(n = k)</code> — keep edges among the most-connected
+nodes.</li>
+</ul>
+<p><code>backbone()</code> applies the disparity filter, which keeps
+edges that are strong relative to a node’s local strength distribution —
+not a global cutoff:</p>
+<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a>bb <span class="ot">&lt;-</span> <span class="fu">backbone</span>(edges, <span class="at">alpha =</span> <span class="fl">0.05</span>)</span>
+<span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a><span class="fu">nrow</span>(bb)</span>
+<span id="cb23-3"><a href="#cb23-3" tabindex="-1"></a><span class="co">#&gt; [1] 232</span></span></code></pre></div>
 </div>
 <div id="temporal-networks" class="section level2">
-<h2>Temporal Networks</h2>
-<p><code>temporal_network()</code> runs any network builder over time
-windows:</p>
-<div class="sourceCode" id="cb31"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" tabindex="-1"></a>tn <span class="ot">&lt;-</span> <span class="fu">temporal_network</span>(oa, author_network, <span class="st">&quot;collaboration&quot;</span>, <span class="at">window =</span> <span class="dv">3</span>)</span>
-<span id="cb31-2"><a href="#cb31-2" tabindex="-1"></a><span class="fu">names</span>(tn)</span>
-<span id="cb31-3"><a href="#cb31-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;2011-2013&quot; &quot;2014-2016&quot; &quot;2017-2019&quot; &quot;2020-2022&quot; &quot;2023-2025&quot; &quot;2026-2026&quot;</span></span></code></pre></div>
-<p>Fixed windows are non-overlapping. Sliding windows overlap:</p>
-<div class="sourceCode" id="cb32"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" tabindex="-1"></a>tn_slide <span class="ot">&lt;-</span> <span class="fu">temporal_network</span>(</span>
-<span id="cb32-2"><a href="#cb32-2" tabindex="-1"></a>  oa,</span>
-<span id="cb32-3"><a href="#cb32-3" tabindex="-1"></a>  author_network,</span>
-<span id="cb32-4"><a href="#cb32-4" tabindex="-1"></a>  <span class="st">&quot;collaboration&quot;</span>,</span>
-<span id="cb32-5"><a href="#cb32-5" tabindex="-1"></a>  <span class="at">window =</span> <span class="dv">3</span>,</span>
-<span id="cb32-6"><a href="#cb32-6" tabindex="-1"></a>  <span class="at">step =</span> <span class="dv">1</span>,</span>
-<span id="cb32-7"><a href="#cb32-7" tabindex="-1"></a>  <span class="at">strategy =</span> <span class="st">&quot;sliding&quot;</span></span>
-<span id="cb32-8"><a href="#cb32-8" tabindex="-1"></a>)</span>
-<span id="cb32-9"><a href="#cb32-9" tabindex="-1"></a></span>
-<span id="cb32-10"><a href="#cb32-10" tabindex="-1"></a><span class="fu">names</span>(tn_slide)</span>
-<span id="cb32-11"><a href="#cb32-11" tabindex="-1"></a><span class="co">#&gt;  [1] &quot;2011-2013&quot; &quot;2012-2014&quot; &quot;2013-2015&quot; &quot;2014-2016&quot; &quot;2015-2017&quot; &quot;2016-2018&quot;</span></span>
-<span id="cb32-12"><a href="#cb32-12" tabindex="-1"></a><span class="co">#&gt;  [7] &quot;2017-2019&quot; &quot;2018-2020&quot; &quot;2019-2021&quot; &quot;2020-2022&quot; &quot;2021-2023&quot; &quot;2022-2024&quot;</span></span>
-<span id="cb32-13"><a href="#cb32-13" tabindex="-1"></a><span class="co">#&gt; [13] &quot;2023-2025&quot; &quot;2024-2026&quot;</span></span></code></pre></div>
-<p>Cumulative windows always start at the first observed year and grow
-forward:</p>
-<div class="sourceCode" id="cb33"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" tabindex="-1"></a>tn_cum <span class="ot">&lt;-</span> <span class="fu">temporal_network</span>(</span>
-<span id="cb33-2"><a href="#cb33-2" tabindex="-1"></a>  oa,</span>
-<span id="cb33-3"><a href="#cb33-3" tabindex="-1"></a>  author_network,</span>
-<span id="cb33-4"><a href="#cb33-4" tabindex="-1"></a>  <span class="st">&quot;collaboration&quot;</span>,</span>
-<span id="cb33-5"><a href="#cb33-5" tabindex="-1"></a>  <span class="at">window =</span> <span class="dv">3</span>,</span>
-<span id="cb33-6"><a href="#cb33-6" tabindex="-1"></a>  <span class="at">strategy =</span> <span class="st">&quot;cumulative&quot;</span></span>
-<span id="cb33-7"><a href="#cb33-7" tabindex="-1"></a>)</span>
-<span id="cb33-8"><a href="#cb33-8" tabindex="-1"></a></span>
-<span id="cb33-9"><a href="#cb33-9" tabindex="-1"></a><span class="fu">names</span>(tn_cum)</span>
-<span id="cb33-10"><a href="#cb33-10" tabindex="-1"></a><span class="co">#&gt;  [1] &quot;2011-2013&quot; &quot;2011-2014&quot; &quot;2011-2015&quot; &quot;2011-2016&quot; &quot;2011-2017&quot; &quot;2011-2018&quot;</span></span>
-<span id="cb33-11"><a href="#cb33-11" tabindex="-1"></a><span class="co">#&gt;  [7] &quot;2011-2019&quot; &quot;2011-2020&quot; &quot;2011-2021&quot; &quot;2011-2022&quot; &quot;2011-2023&quot; &quot;2011-2024&quot;</span></span>
-<span id="cb33-12"><a href="#cb33-12" tabindex="-1"></a><span class="co">#&gt; [13] &quot;2011-2025&quot; &quot;2011-2026&quot;</span></span></code></pre></div>
-<p>Each returned edge list has a <code>window</code> column. Windows
-with fewer than two records or no surviving edges are omitted. If a
-builder errors inside a window, <code>temporal_network()</code> reports
-a warning with the window label.</p>
+<h2>Temporal networks</h2>
+<p><code>temporal_network()</code> runs any builder over time windows
+(fixed, sliding, or cumulative):</p>
+<div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a>tn <span class="ot">&lt;-</span> <span class="fu">temporal_network</span>(oa, author_network, <span class="st">&quot;collaboration&quot;</span>, <span class="at">window =</span> <span class="dv">3</span>)</span>
+<span id="cb24-2"><a href="#cb24-2" tabindex="-1"></a><span class="fu">names</span>(tn)</span>
+<span id="cb24-3"><a href="#cb24-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;2011-2013&quot; &quot;2014-2016&quot; &quot;2017-2019&quot; &quot;2020-2022&quot; &quot;2023-2025&quot; &quot;2026-2026&quot;</span></span></code></pre></div>
+<p>Each window’s edge list carries a <code>window</code> column. Windows
+with fewer than two records, or no surviving edges, are dropped; a
+builder error inside a window becomes a warning labelled with that
+window.</p>
 </div>
 <div id="local-citations-and-historiographs" class="section level2">
-<h2>Local Citations and Historiographs</h2>
+<h2>Local citations and historiographs</h2>
 <p><code>local_citations()</code> counts how often each document is
-cited by other documents inside the same dataset:</p>
-<div class="sourceCode" id="cb34"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" tabindex="-1"></a>lcs <span class="ot">&lt;-</span> <span class="fu">local_citations</span>(sc)</span>
-<span id="cb34-2"><a href="#cb34-2" tabindex="-1"></a><span class="fu">head</span>(lcs, <span class="dv">5</span>)</span>
-<span id="cb34-3"><a href="#cb34-3" tabindex="-1"></a><span class="co">#&gt;                    id lcs gcs year</span></span>
-<span id="cb34-4"><a href="#cb34-4" tabindex="-1"></a><span class="co">#&gt; 1 2-s2.0-105007159281   0   0 2025</span></span>
-<span id="cb34-5"><a href="#cb34-5" tabindex="-1"></a><span class="co">#&gt; 2 2-s2.0-105006878874   0   0 2025</span></span>
-<span id="cb34-6"><a href="#cb34-6" tabindex="-1"></a><span class="co">#&gt; 3  2-s2.0-85211114952   0   0 2024</span></span>
-<span id="cb34-7"><a href="#cb34-7" tabindex="-1"></a><span class="co">#&gt; 4 2-s2.0-105001072133   0   0 2025</span></span>
-<span id="cb34-8"><a href="#cb34-8" tabindex="-1"></a><span class="co">#&gt; 5  2-s2.0-85210832535   0   5 2025</span></span>
-<span id="cb34-9"><a href="#cb34-9" tabindex="-1"></a><span class="co">#&gt;                                                                                                                                  title</span></span>
-<span id="cb34-10"><a href="#cb34-10" tabindex="-1"></a><span class="co">#&gt; 1                                          Quantum Computing in the RAN with Qu4Fec: Closing Gaps Towards Quantum-based FEC Processors</span></span>
-<span id="cb34-11"><a href="#cb34-11" tabindex="-1"></a><span class="co">#&gt; 2                                                An FPGA-based bit-level weight sparsity and mixed-bit accelerator for neural networks</span></span>
-<span id="cb34-12"><a href="#cb34-12" tabindex="-1"></a><span class="co">#&gt; 3                             FQP: A Fibonacci Quantization Processor with Multiplication-Free Computing and Topological-Order Routing</span></span>
-<span id="cb34-13"><a href="#cb34-13" tabindex="-1"></a><span class="co">#&gt; 4                                                   SysCIM: A Heterogeneous Chip Architecture for High-Efficiency CNN Training at Edge</span></span>
-<span id="cb34-14"><a href="#cb34-14" tabindex="-1"></a><span class="co">#&gt; 5 Integer-Valued Training and Spike-Driven Inference Spiking Neural Network for High-Performance and Energy-Efficient Object Detection</span></span>
-<span id="cb34-15"><a href="#cb34-15" tabindex="-1"></a><span class="co">#&gt;                                                                                                                                 journal</span></span>
-<span id="cb34-16"><a href="#cb34-16" tabindex="-1"></a><span class="co">#&gt; 1                                                               Proceedings of the ACM on Measurement and Analysis of Computing Systems</span></span>
-<span id="cb34-17"><a href="#cb34-17" tabindex="-1"></a><span class="co">#&gt; 2                                                                                                       Journal of Systems Architecture</span></span>
-<span id="cb34-18"><a href="#cb34-18" tabindex="-1"></a><span class="co">#&gt; 3                                                                                            Proceedings - Design Automation Conference</span></span>
-<span id="cb34-19"><a href="#cb34-19" tabindex="-1"></a><span class="co">#&gt; 4                                                                      IEEE Transactions on Very Large Scale Integration (VLSI) Systems</span></span>
-<span id="cb34-20"><a href="#cb34-20" tabindex="-1"></a><span class="co">#&gt; 5 Lecture Notes in Computer Science (including subseries Lecture Notes in Artificial Intelligence and Lecture Notes in Bioinformatics) </span></span>
-<span id="cb34-21"><a href="#cb34-21" tabindex="-1"></a><span class="co">#&gt;                            doi</span></span>
-<span id="cb34-22"><a href="#cb34-22" tabindex="-1"></a><span class="co">#&gt; 1              10.1145/3727128</span></span>
-<span id="cb34-23"><a href="#cb34-23" tabindex="-1"></a><span class="co">#&gt; 2 10.1016/j.sysarc.2025.103463</span></span>
-<span id="cb34-24"><a href="#cb34-24" tabindex="-1"></a><span class="co">#&gt; 3      10.1145/3649329.3656502</span></span>
-<span id="cb34-25"><a href="#cb34-25" tabindex="-1"></a><span class="co">#&gt; 4   10.1109/TVLSI.2025.3526363</span></span>
-<span id="cb34-26"><a href="#cb34-26" tabindex="-1"></a><span class="co">#&gt; 5 10.1007/978-3-031-73411-3_15</span></span></code></pre></div>
-<p><code>historiograph()</code> builds a directed citation graph among
-the top locally cited documents:</p>
-<div class="sourceCode" id="cb35"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" tabindex="-1"></a>h <span class="ot">&lt;-</span> <span class="fu">historiograph</span>(sc, <span class="at">n =</span> <span class="dv">10</span>)</span>
-<span id="cb35-2"><a href="#cb35-2" tabindex="-1"></a>h<span class="sc">$</span>nodes</span>
-<span id="cb35-3"><a href="#cb35-3" tabindex="-1"></a><span class="co">#&gt; [1] id      lcs     gcs     year    title   journal doi    </span></span>
-<span id="cb35-4"><a href="#cb35-4" tabindex="-1"></a><span class="co">#&gt; &lt;0 rows&gt; (or 0-length row.names)</span></span>
-<span id="cb35-5"><a href="#cb35-5" tabindex="-1"></a><span class="fu">head</span>(h<span class="sc">$</span>edges, <span class="dv">5</span>)</span>
-<span id="cb35-6"><a href="#cb35-6" tabindex="-1"></a><span class="co">#&gt; [1] from      to        year_from year_to  </span></span>
-<span id="cb35-7"><a href="#cb35-7" tabindex="-1"></a><span class="co">#&gt; &lt;0 rows&gt; (or 0-length row.names)</span></span></code></pre></div>
-<p>This requires reference strings or IDs to match document IDs in the
-same data frame. If the cited works are external to the corpus, local
-citation counts will be low or zero even when global citation counts are
-high.</p>
+cited by others in the same corpus; <code>historiograph()</code> builds
+the directed citation graph among the top-cited documents:</p>
+<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">local_citations</span>(sc), <span class="dv">5</span>)</span>
+<span id="cb25-2"><a href="#cb25-2" tabindex="-1"></a><span class="co">#&gt;                    id lcs gcs year</span></span>
+<span id="cb25-3"><a href="#cb25-3" tabindex="-1"></a><span class="co">#&gt; 1 2-s2.0-105007159281   0   0 2025</span></span>
+<span id="cb25-4"><a href="#cb25-4" tabindex="-1"></a><span class="co">#&gt; 2 2-s2.0-105006878874   0   0 2025</span></span>
+<span id="cb25-5"><a href="#cb25-5" tabindex="-1"></a><span class="co">#&gt; 3  2-s2.0-85211114952   0   0 2024</span></span>
+<span id="cb25-6"><a href="#cb25-6" tabindex="-1"></a><span class="co">#&gt; 4 2-s2.0-105001072133   0   0 2025</span></span>
+<span id="cb25-7"><a href="#cb25-7" tabindex="-1"></a><span class="co">#&gt; 5  2-s2.0-85210832535   0   5 2025</span></span>
+<span id="cb25-8"><a href="#cb25-8" tabindex="-1"></a><span class="co">#&gt;                                                                                                                                  title</span></span>
+<span id="cb25-9"><a href="#cb25-9" tabindex="-1"></a><span class="co">#&gt; 1                                          Quantum Computing in the RAN with Qu4Fec: Closing Gaps Towards Quantum-based FEC Processors</span></span>
+<span id="cb25-10"><a href="#cb25-10" tabindex="-1"></a><span class="co">#&gt; 2                                                An FPGA-based bit-level weight sparsity and mixed-bit accelerator for neural networks</span></span>
+<span id="cb25-11"><a href="#cb25-11" tabindex="-1"></a><span class="co">#&gt; 3                             FQP: A Fibonacci Quantization Processor with Multiplication-Free Computing and Topological-Order Routing</span></span>
+<span id="cb25-12"><a href="#cb25-12" tabindex="-1"></a><span class="co">#&gt; 4                                                   SysCIM: A Heterogeneous Chip Architecture for High-Efficiency CNN Training at Edge</span></span>
+<span id="cb25-13"><a href="#cb25-13" tabindex="-1"></a><span class="co">#&gt; 5 Integer-Valued Training and Spike-Driven Inference Spiking Neural Network for High-Performance and Energy-Efficient Object Detection</span></span>
+<span id="cb25-14"><a href="#cb25-14" tabindex="-1"></a><span class="co">#&gt;                                                                                                                                 journal</span></span>
+<span id="cb25-15"><a href="#cb25-15" tabindex="-1"></a><span class="co">#&gt; 1                                                               Proceedings of the ACM on Measurement and Analysis of Computing Systems</span></span>
+<span id="cb25-16"><a href="#cb25-16" tabindex="-1"></a><span class="co">#&gt; 2                                                                                                       Journal of Systems Architecture</span></span>
+<span id="cb25-17"><a href="#cb25-17" tabindex="-1"></a><span class="co">#&gt; 3                                                                                            Proceedings - Design Automation Conference</span></span>
+<span id="cb25-18"><a href="#cb25-18" tabindex="-1"></a><span class="co">#&gt; 4                                                                      IEEE Transactions on Very Large Scale Integration (VLSI) Systems</span></span>
+<span id="cb25-19"><a href="#cb25-19" tabindex="-1"></a><span class="co">#&gt; 5 Lecture Notes in Computer Science (including subseries Lecture Notes in Artificial Intelligence and Lecture Notes in Bioinformatics) </span></span>
+<span id="cb25-20"><a href="#cb25-20" tabindex="-1"></a><span class="co">#&gt;                            doi</span></span>
+<span id="cb25-21"><a href="#cb25-21" tabindex="-1"></a><span class="co">#&gt; 1              10.1145/3727128</span></span>
+<span id="cb25-22"><a href="#cb25-22" tabindex="-1"></a><span class="co">#&gt; 2 10.1016/j.sysarc.2025.103463</span></span>
+<span id="cb25-23"><a href="#cb25-23" tabindex="-1"></a><span class="co">#&gt; 3      10.1145/3649329.3656502</span></span>
+<span id="cb25-24"><a href="#cb25-24" tabindex="-1"></a><span class="co">#&gt; 4   10.1109/TVLSI.2025.3526363</span></span>
+<span id="cb25-25"><a href="#cb25-25" tabindex="-1"></a><span class="co">#&gt; 5 10.1007/978-3-031-73411-3_15</span></span>
+<span id="cb25-26"><a href="#cb25-26" tabindex="-1"></a></span>
+<span id="cb25-27"><a href="#cb25-27" tabindex="-1"></a>h <span class="ot">&lt;-</span> <span class="fu">historiograph</span>(sc, <span class="at">n =</span> <span class="dv">10</span>)</span>
+<span id="cb25-28"><a href="#cb25-28" tabindex="-1"></a>h<span class="sc">$</span>nodes</span>
+<span id="cb25-29"><a href="#cb25-29" tabindex="-1"></a><span class="co">#&gt; [1] id      lcs     gcs     year    title   journal doi    </span></span>
+<span id="cb25-30"><a href="#cb25-30" tabindex="-1"></a><span class="co">#&gt; &lt;0 rows&gt; (or 0-length row.names)</span></span>
+<span id="cb25-31"><a href="#cb25-31" tabindex="-1"></a><span class="fu">head</span>(h<span class="sc">$</span>edges, <span class="dv">5</span>)</span>
+<span id="cb25-32"><a href="#cb25-32" tabindex="-1"></a><span class="co">#&gt; [1] from      to        year_from year_to  </span></span>
+<span id="cb25-33"><a href="#cb25-33" tabindex="-1"></a><span class="co">#&gt; &lt;0 rows&gt; (or 0-length row.names)</span></span></code></pre></div>
+<p>Both require reference strings or IDs to match document IDs in the
+data; if the cited works are external, local counts stay low.</p>
 </div>
-<div id="exporting-results" class="section level2">
-<h2>Exporting Results</h2>
-<p>The default edge list is already useful for many tools:</p>
-<div class="sourceCode" id="cb36"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" tabindex="-1"></a>edges <span class="ot">&lt;-</span> <span class="fu">keyword_network</span>(sc, <span class="at">min_occur =</span> <span class="dv">2</span>)</span>
-<span id="cb36-2"><a href="#cb36-2" tabindex="-1"></a><span class="fu">head</span>(edges, <span class="dv">5</span>)</span>
-<span id="cb36-3"><a href="#cb36-3" tabindex="-1"></a><span class="co">#&gt; # bibnets network: keyword_co_occurrence | 5 nodes · 5 edges | counting: full </span></span>
-<span id="cb36-4"><a href="#cb36-4" tabindex="-1"></a><span class="co">#&gt;    from            to              weight  count</span></span>
-<span id="cb36-5"><a href="#cb36-5" tabindex="-1"></a><span class="co">#&gt; 1  EDGE COMPUTING  QUANTIZATION        16     16</span></span>
-<span id="cb36-6"><a href="#cb36-6" tabindex="-1"></a><span class="co">#&gt; 2  DEEP LEARNING   QUANTIZATION        14     14</span></span>
-<span id="cb36-7"><a href="#cb36-7" tabindex="-1"></a><span class="co">#&gt; 3  DEEP LEARNING   EDGE COMPUTING      13     13</span></span>
-<span id="cb36-8"><a href="#cb36-8" tabindex="-1"></a><span class="co">#&gt; 4  DEEP LEARNING   FPGA                10     10</span></span>
-<span id="cb36-9"><a href="#cb36-9" tabindex="-1"></a><span class="co">#&gt; 5  PRUNING         QUANTIZATION        10     10</span></span></code></pre></div>
-<p>Convert to a sparse matrix:</p>
-<div class="sourceCode" id="cb37"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1" tabindex="-1"></a>m <span class="ot">&lt;-</span> <span class="fu">to_matrix</span>(edges)</span>
-<span id="cb37-2"><a href="#cb37-2" tabindex="-1"></a>m[<span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>]</span>
-<span id="cb37-3"><a href="#cb37-3" tabindex="-1"></a><span class="co">#&gt; 4 x 4 sparse Matrix of class &quot;dgCMatrix&quot;</span></span>
-<span id="cb37-4"><a href="#cb37-4" tabindex="-1"></a><span class="co">#&gt;                ACCELERATION ACCELERATOR ACCURACY AI ACCELERATOR</span></span>
-<span id="cb37-5"><a href="#cb37-5" tabindex="-1"></a><span class="co">#&gt; ACCELERATION              .           .        .              .</span></span>
-<span id="cb37-6"><a href="#cb37-6" tabindex="-1"></a><span class="co">#&gt; ACCELERATOR               .           .        .              .</span></span>
-<span id="cb37-7"><a href="#cb37-7" tabindex="-1"></a><span class="co">#&gt; ACCURACY                  .           .        .              .</span></span>
-<span id="cb37-8"><a href="#cb37-8" tabindex="-1"></a><span class="co">#&gt; AI ACCELERATOR            .           .        .              .</span></span></code></pre></div>
-<p>Prepare Gephi tables:</p>
-<div class="sourceCode" id="cb38"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" tabindex="-1"></a>gephi <span class="ot">&lt;-</span> <span class="fu">to_gephi</span>(edges)</span>
-<span id="cb38-2"><a href="#cb38-2" tabindex="-1"></a><span class="fu">head</span>(gephi<span class="sc">$</span>nodes, <span class="dv">3</span>)</span>
-<span id="cb38-3"><a href="#cb38-3" tabindex="-1"></a><span class="co">#&gt;               Id          Label</span></span>
-<span id="cb38-4"><a href="#cb38-4" tabindex="-1"></a><span class="co">#&gt; 1 EDGE COMPUTING EDGE COMPUTING</span></span>
-<span id="cb38-5"><a href="#cb38-5" tabindex="-1"></a><span class="co">#&gt; 2  DEEP LEARNING  DEEP LEARNING</span></span>
-<span id="cb38-6"><a href="#cb38-6" tabindex="-1"></a><span class="co">#&gt; 3        PRUNING        PRUNING</span></span>
-<span id="cb38-7"><a href="#cb38-7" tabindex="-1"></a><span class="fu">head</span>(gephi<span class="sc">$</span>edges, <span class="dv">3</span>)</span>
-<span id="cb38-8"><a href="#cb38-8" tabindex="-1"></a><span class="co">#&gt;           Source         Target Weight       Type count</span></span>
-<span id="cb38-9"><a href="#cb38-9" tabindex="-1"></a><span class="co">#&gt; 1 EDGE COMPUTING   QUANTIZATION     16 Undirected    16</span></span>
-<span id="cb38-10"><a href="#cb38-10" tabindex="-1"></a><span class="co">#&gt; 2  DEEP LEARNING   QUANTIZATION     14 Undirected    14</span></span>
-<span id="cb38-11"><a href="#cb38-11" tabindex="-1"></a><span class="co">#&gt; 3  DEEP LEARNING EDGE COMPUTING     13 Undirected    13</span></span></code></pre></div>
-<p>Write GraphML without adding an XML dependency:</p>
-<div class="sourceCode" id="cb39"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb39-1"><a href="#cb39-1" tabindex="-1"></a>xml <span class="ot">&lt;-</span> <span class="fu">to_graphml</span>(edges)</span>
-<span id="cb39-2"><a href="#cb39-2" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">substr</span>(xml, <span class="dv">1</span>, <span class="dv">300</span>))</span>
-<span id="cb39-3"><a href="#cb39-3" tabindex="-1"></a><span class="co">#&gt; &lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;</span></span>
-<span id="cb39-4"><a href="#cb39-4" tabindex="-1"></a><span class="co">#&gt; &lt;graphml xmlns=&quot;http://graphml.graphdrawing.org/graphml&quot;</span></span>
-<span id="cb39-5"><a href="#cb39-5" tabindex="-1"></a><span class="co">#&gt;          xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;</span></span>
-<span id="cb39-6"><a href="#cb39-6" tabindex="-1"></a><span class="co">#&gt;          xsi:schemaLocation=&quot;http://graphml.graphdrawing.org/graphml</span></span>
-<span id="cb39-7"><a href="#cb39-7" tabindex="-1"></a><span class="co">#&gt;          http://graphml.graphdrawing.org/graphml/1.0/graphml.xsd&quot;&gt;</span></span>
-<span id="cb39-8"><a href="#cb39-8" tabindex="-1"></a><span class="co">#&gt;   &lt;ke</span></span></code></pre></div>
-<p>Optional graph objects are available when the suggested packages are
-installed:</p>
-<div class="sourceCode" id="cb40"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">requireNamespace</span>(<span class="st">&quot;igraph&quot;</span>, <span class="at">quietly =</span> <span class="cn">TRUE</span>)) {</span>
-<span id="cb40-2"><a href="#cb40-2" tabindex="-1"></a>  g <span class="ot">&lt;-</span> <span class="fu">to_igraph</span>(edges)</span>
-<span id="cb40-3"><a href="#cb40-3" tabindex="-1"></a>}</span>
-<span id="cb40-4"><a href="#cb40-4" tabindex="-1"></a></span>
-<span id="cb40-5"><a href="#cb40-5" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">requireNamespace</span>(<span class="st">&quot;tidygraph&quot;</span>, <span class="at">quietly =</span> <span class="cn">TRUE</span>)) {</span>
-<span id="cb40-6"><a href="#cb40-6" tabindex="-1"></a>  tg <span class="ot">&lt;-</span> <span class="fu">to_tbl_graph</span>(edges)</span>
-<span id="cb40-7"><a href="#cb40-7" tabindex="-1"></a>}</span>
-<span id="cb40-8"><a href="#cb40-8" tabindex="-1"></a></span>
-<span id="cb40-9"><a href="#cb40-9" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">requireNamespace</span>(<span class="st">&quot;cograph&quot;</span>, <span class="at">quietly =</span> <span class="cn">TRUE</span>)) {</span>
-<span id="cb40-10"><a href="#cb40-10" tabindex="-1"></a>  cg <span class="ot">&lt;-</span> <span class="fu">to_cograph</span>(edges)</span>
-<span id="cb40-11"><a href="#cb40-11" tabindex="-1"></a>}</span></code></pre></div>
+<div id="author-name-normalization" class="section level2">
+<h2>Author-name normalization</h2>
+<p><code>parse_names()</code> reorders and splits author names (it
+recognizes <code>Last, First</code>, <code>SURNAME Initials</code>, and
+<code>First Last</code>). Because node identity is fixed when a network
+is built, normalize <em>before</em> building so that two spellings of
+one author merge:</p>
+<div class="sourceCode" id="cb26"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" tabindex="-1"></a><span class="fu">parse_names</span>(<span class="fu">c</span>(<span class="st">&quot;Saqr, Mohammed&quot;</span>, <span class="st">&quot;WANG Y&quot;</span>, <span class="st">&quot;Mohammed Saqr&quot;</span>))</span>
+<span id="cb26-2"><a href="#cb26-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Mohammed Saqr&quot; &quot;Y WANG&quot;        &quot;Mohammed Saqr&quot;</span></span>
+<span id="cb26-3"><a href="#cb26-3" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;parts&quot;)</span></span>
+<span id="cb26-4"><a href="#cb26-4" tabindex="-1"></a><span class="co">#&gt;         original    first last particle suffix   type</span></span>
+<span id="cb26-5"><a href="#cb26-5" tabindex="-1"></a><span class="co">#&gt; 1 Saqr, Mohammed Mohammed Saqr     &lt;NA&gt;   &lt;NA&gt; person</span></span>
+<span id="cb26-6"><a href="#cb26-6" tabindex="-1"></a><span class="co">#&gt; 2         WANG Y        Y WANG     &lt;NA&gt;   &lt;NA&gt; person</span></span>
+<span id="cb26-7"><a href="#cb26-7" tabindex="-1"></a><span class="co">#&gt; 3  Mohammed Saqr Mohammed Saqr     &lt;NA&gt;   &lt;NA&gt; person</span></span></code></pre></div>
+<p>See <code>vignette(&quot;parsing-author-names&quot;)</code> for the full
+treatment.</p>
 </div>
-<div id="interpreting-a-bibnets_network" class="section level2">
-<h2>Interpreting a <code>bibnets_network</code></h2>
-<p>The object stores construction metadata as attributes:</p>
-<div class="sourceCode" id="cb41"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb41-1"><a href="#cb41-1" tabindex="-1"></a>edges <span class="ot">&lt;-</span> <span class="fu">author_network</span>(oa, <span class="st">&quot;collaboration&quot;</span>, <span class="at">counting =</span> <span class="st">&quot;harmonic&quot;</span>)</span>
-<span id="cb41-2"><a href="#cb41-2" tabindex="-1"></a></span>
-<span id="cb41-3"><a href="#cb41-3" tabindex="-1"></a><span class="fu">attr</span>(edges, <span class="st">&quot;network_type&quot;</span>)</span>
-<span id="cb41-4"><a href="#cb41-4" tabindex="-1"></a><span class="co">#&gt; [1] &quot;author_collaboration&quot;</span></span>
-<span id="cb41-5"><a href="#cb41-5" tabindex="-1"></a><span class="fu">attr</span>(edges, <span class="st">&quot;counting&quot;</span>)</span>
-<span id="cb41-6"><a href="#cb41-6" tabindex="-1"></a><span class="co">#&gt; [1] &quot;harmonic&quot;</span></span>
-<span id="cb41-7"><a href="#cb41-7" tabindex="-1"></a><span class="fu">attr</span>(edges, <span class="st">&quot;similarity&quot;</span>)</span>
-<span id="cb41-8"><a href="#cb41-8" tabindex="-1"></a><span class="co">#&gt; [1] &quot;none&quot;</span></span></code></pre></div>
-<p>The <code>print()</code> method reports the network type, node count,
-edge count, counting method, and similarity method.
-<code>summary()</code> reports basic network and weight summaries:</p>
-<div class="sourceCode" id="cb42"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" tabindex="-1"></a><span class="fu">summary</span>(edges)</span>
-<span id="cb42-2"><a href="#cb42-2" tabindex="-1"></a><span class="co">#&gt; bibnets network</span></span>
-<span id="cb42-3"><a href="#cb42-3" tabindex="-1"></a><span class="co">#&gt; ------------------------------</span></span>
-<span id="cb42-4"><a href="#cb42-4" tabindex="-1"></a><span class="co">#&gt; Type       : author_collaboration</span></span>
-<span id="cb42-5"><a href="#cb42-5" tabindex="-1"></a><span class="co">#&gt; Counting   : harmonic</span></span>
-<span id="cb42-6"><a href="#cb42-6" tabindex="-1"></a><span class="co">#&gt; Similarity : none</span></span>
-<span id="cb42-7"><a href="#cb42-7" tabindex="-1"></a><span class="co">#&gt; Nodes      : 4029</span></span>
-<span id="cb42-8"><a href="#cb42-8" tabindex="-1"></a><span class="co">#&gt; Edges      : 12270</span></span>
-<span id="cb42-9"><a href="#cb42-9" tabindex="-1"></a><span class="co">#&gt; Density    : 0.0015</span></span>
-<span id="cb42-10"><a href="#cb42-10" tabindex="-1"></a><span class="co">#&gt; Weight     : min 1.43e-05  median 0.0106  max 1.41</span></span>
-<span id="cb42-11"><a href="#cb42-11" tabindex="-1"></a><span class="co">#&gt; Top nodes  : DRAGAN GAŠEVIĆ(89), ARI KORHONEN(60), CLAUDIA SZABO(60), JUDY SHEARD(60), PAUL DENNY(56)</span></span></code></pre></div>
-<p>These attributes are meant to make downstream output easier to audit.
-A saved edge list should still say how it was produced.</p>
+<div id="exporting" class="section level2">
+<h2>Exporting</h2>
+<p>The edge list is already usable; converters cover the common
+targets:</p>
+<div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" tabindex="-1"></a>edges <span class="ot">&lt;-</span> <span class="fu">keyword_network</span>(sc, <span class="at">min_occur =</span> <span class="dv">2</span>)</span>
+<span id="cb27-2"><a href="#cb27-2" tabindex="-1"></a></span>
+<span id="cb27-3"><a href="#cb27-3" tabindex="-1"></a>m <span class="ot">&lt;-</span> <span class="fu">to_matrix</span>(edges)            <span class="co"># sparse adjacency matrix</span></span>
+<span id="cb27-4"><a href="#cb27-4" tabindex="-1"></a>m[<span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>]</span>
+<span id="cb27-5"><a href="#cb27-5" tabindex="-1"></a><span class="co">#&gt; 4 x 4 sparse Matrix of class &quot;dgCMatrix&quot;</span></span>
+<span id="cb27-6"><a href="#cb27-6" tabindex="-1"></a><span class="co">#&gt;                ACCELERATION ACCELERATOR ACCURACY AI ACCELERATOR</span></span>
+<span id="cb27-7"><a href="#cb27-7" tabindex="-1"></a><span class="co">#&gt; ACCELERATION              .           .        .              .</span></span>
+<span id="cb27-8"><a href="#cb27-8" tabindex="-1"></a><span class="co">#&gt; ACCELERATOR               .           .        .              .</span></span>
+<span id="cb27-9"><a href="#cb27-9" tabindex="-1"></a><span class="co">#&gt; ACCURACY                  .           .        .              .</span></span>
+<span id="cb27-10"><a href="#cb27-10" tabindex="-1"></a><span class="co">#&gt; AI ACCELERATOR            .           .        .              .</span></span>
+<span id="cb27-11"><a href="#cb27-11" tabindex="-1"></a></span>
+<span id="cb27-12"><a href="#cb27-12" tabindex="-1"></a>gephi <span class="ot">&lt;-</span> <span class="fu">to_gephi</span>(edges)         <span class="co"># Gephi node/edge tables</span></span>
+<span id="cb27-13"><a href="#cb27-13" tabindex="-1"></a><span class="fu">head</span>(gephi<span class="sc">$</span>edges, <span class="dv">3</span>)</span>
+<span id="cb27-14"><a href="#cb27-14" tabindex="-1"></a><span class="co">#&gt;           Source         Target Weight       Type count</span></span>
+<span id="cb27-15"><a href="#cb27-15" tabindex="-1"></a><span class="co">#&gt; 1 EDGE COMPUTING   QUANTIZATION     16 Undirected    16</span></span>
+<span id="cb27-16"><a href="#cb27-16" tabindex="-1"></a><span class="co">#&gt; 2  DEEP LEARNING   QUANTIZATION     14 Undirected    14</span></span>
+<span id="cb27-17"><a href="#cb27-17" tabindex="-1"></a><span class="co">#&gt; 3  DEEP LEARNING EDGE COMPUTING     13 Undirected    13</span></span>
+<span id="cb27-18"><a href="#cb27-18" tabindex="-1"></a></span>
+<span id="cb27-19"><a href="#cb27-19" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">substr</span>(<span class="fu">to_graphml</span>(edges), <span class="dv">1</span>, <span class="dv">200</span>))   <span class="co"># GraphML, no XML dependency</span></span>
+<span id="cb27-20"><a href="#cb27-20" tabindex="-1"></a><span class="co">#&gt; &lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;</span></span>
+<span id="cb27-21"><a href="#cb27-21" tabindex="-1"></a><span class="co">#&gt; &lt;graphml xmlns=&quot;http://graphml.graphdrawing.org/graphml&quot;</span></span>
+<span id="cb27-22"><a href="#cb27-22" tabindex="-1"></a><span class="co">#&gt;          xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;</span></span>
+<span id="cb27-23"><a href="#cb27-23" tabindex="-1"></a><span class="co">#&gt;          xsi:schemaLocation=&quot;http://graph</span></span></code></pre></div>
+<p><code>to_igraph()</code>, <code>to_tbl_graph()</code>, and
+<code>to_cograph()</code> are available when their (suggested) packages
+are installed.</p>
+</div>
+<div id="reading-a-bibnets_network" class="section level2">
+<h2>Reading a <code>bibnets_network</code></h2>
+<p>The object records how it was built, as attributes:</p>
+<div class="sourceCode" id="cb28"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" tabindex="-1"></a>edges <span class="ot">&lt;-</span> <span class="fu">author_network</span>(oa, <span class="at">type =</span> <span class="st">&quot;collaboration&quot;</span>, <span class="at">counting =</span> <span class="st">&quot;harmonic&quot;</span>)</span>
+<span id="cb28-2"><a href="#cb28-2" tabindex="-1"></a><span class="fu">c</span>(<span class="at">type     =</span> <span class="fu">attr</span>(edges, <span class="st">&quot;network_type&quot;</span>),</span>
+<span id="cb28-3"><a href="#cb28-3" tabindex="-1"></a>  <span class="at">counting =</span> <span class="fu">attr</span>(edges, <span class="st">&quot;counting&quot;</span>),</span>
+<span id="cb28-4"><a href="#cb28-4" tabindex="-1"></a>  <span class="at">sim      =</span> <span class="fu">attr</span>(edges, <span class="st">&quot;similarity&quot;</span>))</span>
+<span id="cb28-5"><a href="#cb28-5" tabindex="-1"></a><span class="co">#&gt;                   type               counting                    sim </span></span>
+<span id="cb28-6"><a href="#cb28-6" tabindex="-1"></a><span class="co">#&gt; &quot;author_collaboration&quot;             &quot;harmonic&quot;                 &quot;none&quot;</span></span>
+<span id="cb28-7"><a href="#cb28-7" tabindex="-1"></a></span>
+<span id="cb28-8"><a href="#cb28-8" tabindex="-1"></a><span class="fu">summary</span>(edges)</span>
+<span id="cb28-9"><a href="#cb28-9" tabindex="-1"></a><span class="co">#&gt; bibnets network</span></span>
+<span id="cb28-10"><a href="#cb28-10" tabindex="-1"></a><span class="co">#&gt; ------------------------------</span></span>
+<span id="cb28-11"><a href="#cb28-11" tabindex="-1"></a><span class="co">#&gt; Type       : author_collaboration</span></span>
+<span id="cb28-12"><a href="#cb28-12" tabindex="-1"></a><span class="co">#&gt; Counting   : harmonic</span></span>
+<span id="cb28-13"><a href="#cb28-13" tabindex="-1"></a><span class="co">#&gt; Similarity : none</span></span>
+<span id="cb28-14"><a href="#cb28-14" tabindex="-1"></a><span class="co">#&gt; Nodes      : 4029</span></span>
+<span id="cb28-15"><a href="#cb28-15" tabindex="-1"></a><span class="co">#&gt; Edges      : 12270</span></span>
+<span id="cb28-16"><a href="#cb28-16" tabindex="-1"></a><span class="co">#&gt; Density    : 0.0015</span></span>
+<span id="cb28-17"><a href="#cb28-17" tabindex="-1"></a><span class="co">#&gt; Weight     : min 1.43e-05  median 0.0106  max 1.41</span></span>
+<span id="cb28-18"><a href="#cb28-18" tabindex="-1"></a><span class="co">#&gt; Top nodes  : DRAGAN GAŠEVIĆ(89), ARI KORHONEN(60), CLAUDIA SZABO(60), JUDY SHEARD(60), PAUL DENNY(56)</span></span></code></pre></div>
+<p><code>print()</code> reports the network type, node and edge counts,
+and the counting and similarity methods — so a saved edge list always
+says how it was made.</p>
+</div>
+<div id="references" class="section level2">
+<h2>References</h2>
+<p>The methodology implemented in <code>bibnets</code> is described
+in:</p>
+<p>López-Pernas, S., Saqr, M., &amp; Apiola, M. (2023). Scientometrics:
+A Concise Introduction and a Detailed Methodology for Mapping the
+Scientific Field of Computing Education Research. In M. Apiola, S.
+López-Pernas, &amp; M. Saqr (Eds.), <em>Past, Present and Future of
+Computing Education Research: A Global Perspective</em> (pp. 79–99).
+Springer Nature Switzerland AG. <a href="https://doi.org/10.1007/978-3-031-25336-2_5" class="uri">https://doi.org/10.1007/978-3-031-25336-2_5</a></p>
+<p>Saqr, M., López-Pernas, S., Conde, M. Á., &amp; Hernández-García, Á.
+(2024). Social Network Analysis: A primer, a guide and a tutorial in R.
+In M. Saqr &amp; S. López-Pernas (Eds.), <em>Learning Analytics Methods
+and Tutorials: A Practical Guide Using R</em> (pp. 491–518). Springer,
+Cham. <a href="https://doi.org/10.1007/978-3-031-54464-4_15" class="uri">https://doi.org/10.1007/978-3-031-54464-4_15</a></p>
 </div>
 
 

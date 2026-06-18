@@ -1,6 +1,6 @@
 Package: bibnets
 Title: Importing, Constructing, and Exporting Bibliometric Networks
-Version: 0.4.4
+Version: 0.6.0
 Authors@R: c(
     person("Mohammed", "Saqr", , "saqr@saqr.me", role = c("aut", "cre", "cph"),
            comment = c(ORCID = "0000-0001-5881-3109")),
@@ -31,11 +31,11 @@ LazyData: true
 LazyDataCompression: xz
 RoxygenNote: 7.3.3
 NeedsCompilation: no
-Packaged: 2026-05-16 07:39:30 UTC; mohammedsaqr
+Packaged: 2026-06-18 18:29:30 UTC; mohammedsaqr
 Author: Mohammed Saqr [aut, cre, cph] (ORCID:
     <https://orcid.org/0000-0001-5881-3109>),
   Sonsoles López-Pernas [aut] (ORCID:
     <https://orcid.org/0000-0002-9621-1392>)
 Maintainer: Mohammed Saqr <saqr@saqr.me>
 Repository: CRAN
-Date/Publication: 2026-05-20 09:10:14 UTC
+Date/Publication: 2026-06-18 19:00:02 UTC

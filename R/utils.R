@@ -88,11 +88,33 @@ aggregate_by_entity <- function(data, entity_field, value_field, min_freq = 1L) 
 #' @examples
 #' split_field(c("Alice; Bob; Carol", "Dave; Eve"))
 split_field <- function(x, sep = ";") {
+  x <- as.character(x)
   lapply(x, function(s) {
     if (is.na(s) || nchar(trimws(s)) == 0) return(character(0))
     parts <- trimws(strsplit(s, sep, fixed = TRUE)[[1]])
     parts[nchar(parts) > 0]
   })
+}
+
+
+#' Strip surrounding quote characters from entity labels
+#'
+#' Removes leading/trailing double-quote characters (straight `"`, the CSV
+#' doubled `""`, and curly quotes) plus surrounding whitespace, so quoted
+#' values such as `"Alice"` or `""Bob""` become `Alice` / `Bob`. Quotes
+#' inside a label (e.g. an apostrophe in `O'Brien`) are left untouched.
+#'
+#' @param x Character vector.
+#' @return Character vector with surrounding quotes/whitespace removed.
+#' @keywords internal
+strip_surrounding_quotes <- function(x) {
+  if (!length(x)) return(x)
+  ## Straight ("), left curly (U+201C), right curly (U+201D) double quotes.
+  q <- "[\"\u201c\u201d]+"
+  x <- trimws(x)
+  x <- sub(paste0("^", q), "", x)
+  x <- sub(paste0(q, "$"), "", x)
+  trimws(x)
 }
 
 
@@ -133,6 +155,48 @@ check_data <- function(data, required) {
   if (length(missing) > 0)
     stop("Required column(s) not found in data: ",
          paste0("'", missing, "'", collapse = ", "), call. = FALSE)
+}
+
+#' Resolve the work-identifier column
+#'
+#' Materializes a top-level `id` column that the network pipeline uses to
+#' index works (matrix rows). Resolution rules:
+#'
+#' - `id = NULL` (default): use the existing `id` column if one is present,
+#'   otherwise fall back to row numbers (`seq_len(nrow(data))`).
+#' - `id = "colname"`: copy the named column to `id`. The column must exist.
+#'
+#' When `id` names a column other than `"id"` and the data *already* has a
+#' distinct `"id"` column, the request is ambiguous (the existing `"id"`
+#' column might itself be an entity field). Rather than silently overwriting
+#' it, this errors and asks the caller to resolve the conflict.
+#'
+#' @param data A data frame.
+#' @param id `NULL` or a single column name (character scalar).
+#'
+#' @return `data` with a guaranteed character `id` column.
+#' @keywords internal
+resolve_id <- function(data, id = NULL) {
+  if (!is.data.frame(data))
+    stop("'data' must be a data frame, not ", class(data)[1], call. = FALSE)
+  if (!is.null(id)) {
+    if (!is.character(id) || length(id) != 1L)
+      stop("'id' must be NULL or a single column name (a string).",
+           call. = FALSE)
+    if (!id %in% names(data))
+      stop("id column '", id, "' not found in data. Available columns: ",
+           paste(names(data), collapse = ", "), call. = FALSE)
+    new_ids <- as.character(data[[id]])
+    if (id != "id" && "id" %in% names(data) &&
+        !identical(as.character(data[["id"]]), new_ids))
+      stop("id = '", id, "' conflicts with the existing 'id' column ",
+           "(their values differ). Drop or rename the 'id' column, or use ",
+           "it directly with id = NULL.", call. = FALSE)
+    data[["id"]] <- new_ids
+  } else if (!"id" %in% names(data)) {
+    data[["id"]] <- as.character(seq_len(nrow(data)))
+  }
+  data
 }
 
 #' @keywords internal

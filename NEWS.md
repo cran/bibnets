@@ -1,3 +1,159 @@
+# bibnets 0.6.0
+
+## Breaking changes
+
+- The example dataset `open_alex_gold_open_access_learning_analytics` is
+  renamed to `learning_analytics`. Update `data(...)` calls accordingly.
+
+## New features
+
+- **`id` argument on every network builder.** `author_network()`,
+  `keyword_network()`, `reference_network()`, `document_network()`,
+  `source_network()`, `country_network()`, `institution_network()`,
+  `conetwork()`, `local_citations()`, and `historiograph()` gain an `id`
+  argument that names the work-identifier column (the rows of the
+  `works x entities` matrix). This completes the custom-column workflow
+  introduced in 0.5.0, which had given every *entity* field a self-naming
+  argument but still required the *works* column to be named `id`.
+  - `id = NULL` (default): use an existing `id` column when present,
+    otherwise fall back to row numbers (each row is one document). A custom
+    data frame with no identifier column now builds without error.
+  - `id = "paper_id"`: use any named column as the identifier.
+
+  The new argument sits at the end of each signature, so existing positional
+  calls are unaffected. If `id` names a column other than `"id"` while the
+  data already has a distinct `"id"` column, the call errors rather than
+  silently overwriting that column (which might itself be an entity field).
+
+## Bug fixes
+
+- `split_field()` (and therefore every builder) now coerces a `factor`
+  entity column to character before splitting, instead of failing with
+  "non-character argument". Hand-built data frames with
+  `stringsAsFactors = TRUE` now work like character columns.
+
+## Generic reader: map columns by entity name
+
+- `read_biblio(format = "generic", ...)` now takes entity-named arguments
+  — `authors`, `keywords`, `references`, `countries`, `affiliations`, and
+  `journal` — each naming the source column to map onto that standard
+  field. Multi-valued fields are split on `sep` into the standard
+  list-column; `journal` is kept scalar. This mirrors the network-builder
+  vocabulary, so the same field names are used end to end:
+
+  ```r
+  read_biblio("my.csv", format = "generic", id = "paper_id",
+              authors = "Author Names", keywords = "Tags", sep = ",")
+  ```
+
+  `list_cols` is retained for splitting any further columns in place
+  (keeping their original names). Naming any of these columns (or `id`)
+  implies `format = "generic"`, so passing `format` is optional:
+
+  ```r
+  read_biblio("my.csv", id = "paper_id", authors = "Author Names", sep = ",")
+  ```
+
+## Deprecations
+
+- The generic reader's `actors` argument is deprecated — the columns it
+  named were never only "actors". Use the entity arguments above (or
+  `list_cols` for arbitrary columns). `actors` still works, mapped to
+  `list_cols`, with a deprecation warning.
+
+# bibnets 0.5.1
+
+## Documentation
+
+- The README now documents the custom column/separator network-builder
+  arguments introduced in 0.5.0: a "Custom Columns and Separators" section
+  covers the entity-named column arguments (`authors`, `keywords`,
+  `references`, `journal`, `countries`, `affiliations`), `sep`,
+  `references_sep`, and `strip_quotes`, with a per-builder
+  default-argument table. The deprecated `keyword_network(field = )`
+  example was updated to the `keywords = ` form.
+- No user-facing code changes.
+
+# bibnets 0.5.0
+
+## New features
+
+- **Custom data sets, any column name, any separator.** Every network
+  builder now takes a self-describing column argument plus `sep`, so a
+  non-standard CSV works in a single call without renaming columns or
+  pre-splitting strings:
+  - `author_network(d, authors = "Author Names", sep = ",")`
+  - `keyword_network(d, keywords = "Tags", sep = ",")`
+  - `reference_network(d, references = "Cited Refs", sep = ",")`
+  - `document_network(d, references = "Cited Refs", sep = ",")`
+  - `source_network(d, journal = "Source title")`
+  - `country_network(d, countries = "Nations", sep = ",")`
+  - `institution_network(d, affiliations = "Orgs", sep = ",")`
+  - `local_citations()` and `historiograph()` gain `references` + `sep`.
+
+  `sep` accepts any delimiter (`","`, `"|"`, `" and "`, ...) and applies
+  to the named entity column. The new arguments sit at the end of each
+  signature, so existing positional calls are unaffected.
+
+- **`references_sep`** — `author_network()`, `country_network()`,
+  `institution_network()`, and `source_network()` gain a `references_sep`
+  argument (default `";"`) so the references column used for coupling can
+  have its own separator, independent of the entity `sep`. (Reference
+  strings often contain internal commas, which is why it is separate.)
+
+- **`strip_quotes`** — every builder gains a `strip_quotes` argument
+  (default `TRUE`) that removes surrounding quote characters (straight
+  `"`, doubled `""`, and curly quotes) from each entity, so a quoted CSV
+  value like `"Alice"` or `""Alice""` is treated as `Alice`. Set
+  `strip_quotes = FALSE` to keep quotes as part of the label. Applies to
+  both freshly-split strings and entities supplied in a list-column.
+
+- `parse_names()`: optional, standalone utility that reorders author
+  names to `"First Last"` and parses each into
+  `first`/`last`/`particle`/`suffix` components (attached as the
+  `"parts"` attribute). Handles three conventions: `"Last, First"`
+  (comma), the Scopus / bibnets `"SURNAME Initials"` label form
+  (`"WANG Y"`, `"AYALA-ROMERO JA"`), and `"First Last"`. The
+  `surname_first` argument (`"auto"`/`"yes"`/`"no"`, default `"auto"`)
+  controls comma-less interpretation, with auto-detection biased toward
+  the bibnets/Scopus convention so native bibnets labels parse without
+  extra arguments. Case-insensitive (recognises particles in bibnets'
+  uppercased labels). `format` argument selects output style:
+  `"first_last"` (default), `"last_initials"` (`"Saqr M."`), or `"last"`
+  (`"Saqr"`). Detects group/corporate authors and leaves them, `NA`,
+  and empty strings unchanged. Not called by any reader or network
+  builder — entity labels are still matched verbatim unless you apply
+  this yourself. Base R only; no new dependencies. Documented in
+  detail in `?parse_names` and the new vignette
+  `vignette("parsing-author-names")`.
+
+## Bug fixes
+
+- Positional counting (`"harmonic"`, `"first"`, etc.) on a plain
+  character author column now splits correctly. Previously a delimited
+  string was treated as a single author, silently producing a wrong
+  network.
+- `author_network(type = "co_citation", self_loops = TRUE)` now honors
+  `self_loops` (previously ignored).
+- `author_network(type = "equivalence")` now forwards `deduplicate`
+  (previously ignored).
+- A wrong separator (split yields no multi-entry rows, yet most values
+  contain a structural delimiter `";"`, `"|"`, or tab) now emits a
+  warning instead of silently building a degenerate network. The
+  heuristic deliberately ignores commas and `" and "`, which occur
+  inside valid single labels (`"Last, First"` names, reference strings,
+  `"Smith and Sons"`), so correct data is never warned about.
+- `read_biblio(format = "generic")` now warns, listing the available
+  columns, when an `actors` column is not found (previously skipped
+  silently).
+
+## Deprecations
+
+- `keyword_network(field = )` is deprecated in favor of
+  `keyword_network(keywords = )`. The old argument still works (with a
+  warning) and stays in its original second position, so
+  `keyword_network(d, "author_keywords")` is unchanged.
+
 # bibnets 0.4.4
 
 ## CRAN pre-test fix

@@ -7,221 +7,145 @@ knitr::opts_chunk$set(
 ## ----setup--------------------------------------------------------------------
 library(bibnets)
 
-## -----------------------------------------------------------------------------
-data(biblio_data)
-data(scopus_quantum_cloud)
-data(open_alex_gold_open_access_learning_analytics)
+## ----quick-df-----------------------------------------------------------------
+papers <- data.frame(
+  `Author Names` = c("Smith J, Doe A, Lee K", "Smith J, Lee K",
+                     "Doe A, Lee K", "Smith J, Doe A"),
+  check.names = FALSE
+)
 
-small <- biblio_data
-sc <- scopus_quantum_cloud
-oa <- open_alex_gold_open_access_learning_analytics
+author_network(papers, authors = "Author Names", sep = ",")
 
-nrow(small)
-nrow(sc)
-nrow(oa)
+## ----quick-reader, eval = FALSE-----------------------------------------------
+# data    <- read_biblio("scopus.csv")
+# authors <- author_network(data, type = "collaboration")
 
-## ----eval = FALSE-------------------------------------------------------------
+## ----read-files, eval = FALSE-------------------------------------------------
 # data <- read_biblio("export.csv")
 # data <- read_biblio("folder_with_exports/")
 # data <- read_biblio(c("part_1.csv", "part_2.csv"))
 
-## ----eval = FALSE-------------------------------------------------------------
-# read_scopus("scopus.csv")
-# read_wos("savedrecs.txt")
-# read_openalex_csv("openalex_works.csv")
-# read_dimensions("dimensions.csv")
-# read_lens("lens.csv")
-# read_bibtex("library.bib")
-# read_ris("library.ris")
-
-## ----eval = FALSE-------------------------------------------------------------
+## ----read-generic, eval = FALSE-----------------------------------------------
 # data <- read_biblio(
 #   "custom.csv",
-#   format = "generic",
-#   id = "paper_id",
-#   actors = c("Authors", "Keywords"),
-#   sep = ";"
+#   id       = "paper_id",
+#   authors  = "Author Names",
+#   keywords = "Tags",
+#   sep      = ","
 # )
 
-## -----------------------------------------------------------------------------
+## ----read-direct, eval = FALSE------------------------------------------------
+# author_network(my_df, authors = "Author Names", sep = ",")
+# keyword_network(my_df, keywords = "Tags",       sep = ",")
+
+## ----schema-------------------------------------------------------------------
+data(scopus_quantum_cloud)
+sc <- scopus_quantum_cloud
 names(sc)[1:12]
 
-## -----------------------------------------------------------------------------
-authors_full <- author_network(oa, type = "collaboration")
-head(authors_full, 5)
+## ----data---------------------------------------------------------------------
+data(biblio_data)
+data(learning_analytics)
 
-## -----------------------------------------------------------------------------
-summary(authors_full)
+small <- biblio_data            # tiny, synthetic
+oa    <- learning_analytics     # 1,508 OpenAlex records on learning analytics
 
-## -----------------------------------------------------------------------------
-authors_core <- author_network(oa, "collaboration", min_occur = 2)
-nrow(authors_full)
-nrow(authors_core)
+c(small = nrow(small), scopus = nrow(sc), openalex = nrow(oa))
 
-## -----------------------------------------------------------------------------
-head(author_network(small, "collaboration", counting = "full"), 5)
+## ----author-basic-------------------------------------------------------------
+authors <- author_network(oa, type = "collaboration")
+head(authors, 5)
+summary(authors)
 
-## -----------------------------------------------------------------------------
-head(author_network(small, "collaboration", counting = "fractional"), 5)
+## ----author-minoccur----------------------------------------------------------
+nrow(author_network(oa, type = "collaboration"))
+nrow(author_network(oa, type = "collaboration", min_occur = 2))
 
-## -----------------------------------------------------------------------------
-head(author_network(small, "collaboration", counting = "harmonic"), 5)
+## ----counting-----------------------------------------------------------------
+head(author_network(small, type = "collaboration", counting = "full"), 3)
+head(author_network(small, type = "collaboration", counting = "fractional"), 3)
+head(author_network(small, type = "collaboration", counting = "harmonic"), 3)
+head(author_network(small, type = "collaboration", counting = "first_last"), 3)
 
-## -----------------------------------------------------------------------------
-head(author_network(small, "collaboration", counting = "first_last"), 5)
+## ----attention----------------------------------------------------------------
+head(author_network(small, attention = "lead"), 3)
 
-## -----------------------------------------------------------------------------
-lead <- author_network(small, attention = "lead")
-last <- author_network(small, attention = "last")
-
-head(lead, 5)
-head(last, 5)
-
-## -----------------------------------------------------------------------------
+## ----cocitation---------------------------------------------------------------
 refs <- reference_network(sc, min_occur = 2)
 head(refs, 5)
 
-## -----------------------------------------------------------------------------
-refs_cos <- reference_network(sc, min_occur = 2, similarity = "cosine")
-head(refs_cos, 5)
+## ----cocitation-cosine--------------------------------------------------------
+head(reference_network(sc, min_occur = 2, similarity = "cosine"), 3)
 
-## -----------------------------------------------------------------------------
-coupled_docs <- document_network(sc, type = "coupling", similarity = "cosine")
-head(coupled_docs, 5)
+## ----coupling-----------------------------------------------------------------
+head(document_network(sc, type = "coupling", similarity = "cosine"), 5)
 
-## -----------------------------------------------------------------------------
-direct_docs <- document_network(sc, type = "citation")
-head(direct_docs, 5)
+## ----citation-----------------------------------------------------------------
+head(document_network(sc, type = "citation"), 5)
 
-## -----------------------------------------------------------------------------
+## ----keywords-----------------------------------------------------------------
 kw <- keyword_network(sc, min_occur = 2)
 head(kw, 5)
 
-## -----------------------------------------------------------------------------
-kw_assoc <- keyword_network(sc, min_occur = 2, similarity = "association")
-head(kw_assoc, 5)
+## ----keywords-assoc-----------------------------------------------------------
+head(keyword_network(sc, min_occur = 2, similarity = "association"), 3)
 
-## -----------------------------------------------------------------------------
-country_edges <- country_network(oa, counting = "fractional")
-head(country_edges, 5)
+## ----geo----------------------------------------------------------------------
+head(country_network(oa, counting = "fractional"), 5)
+head(institution_network(oa, counting = "fractional", min_occur = 2), 5)
+head(source_network(sc, type = "coupling", min_occur = 2), 5)
 
-inst_edges <- institution_network(oa, counting = "fractional", min_occur = 2)
-head(inst_edges, 5)
+## ----conetwork----------------------------------------------------------------
+head(conetwork(sc, "keywords", min_occur = 2), 3)
+head(conetwork(sc, "authors", by = "keywords", min_occur = 2), 3)
 
-## -----------------------------------------------------------------------------
-source_edges <- source_network(sc, type = "coupling", min_occur = 2)
-head(source_edges, 5)
-
-## -----------------------------------------------------------------------------
-head(conetwork(sc, "keywords", min_occur = 2), 5)
-
-## -----------------------------------------------------------------------------
-head(conetwork(sc, "authors", by = "keywords", min_occur = 2), 5)
-
-## -----------------------------------------------------------------------------
-toy <- data.frame(
-  id = c("P1", "P2", "P3"),
-  tags = c("methods; networks", "networks; R", "methods; R")
-)
-
-conetwork(toy, "tags")
-
-## -----------------------------------------------------------------------------
+## ----normalize----------------------------------------------------------------
 none <- keyword_network(sc, min_occur = 2, similarity = "none")
 cos  <- keyword_network(sc, min_occur = 2, similarity = "cosine")
-
 head(none[, c("from", "to", "weight", "count")], 3)
-head(cos[, c("from", "to", "weight", "count")], 3)
+head(cos[,  c("from", "to", "weight", "count")], 3)
 
-## -----------------------------------------------------------------------------
-normalize(to_matrix(keyword_network(small)), "cosine")
+## ----reduce-------------------------------------------------------------------
+edges <- author_network(oa, type = "collaboration")
+c(all        = nrow(edges),
+  threshold  = nrow(prune(edges, threshold = 2)),
+  top_n      = nrow(prune(edges, top_n = 5)),
+  top_nodes  = nrow(filter_top(edges, n = 50)))
 
-## -----------------------------------------------------------------------------
-edges <- author_network(oa, "collaboration")
-
-nrow(edges)
-nrow(prune(edges, threshold = 2))
-nrow(prune(edges, top_n = 5))
-nrow(filter_top(edges, n = 50))
-
-## -----------------------------------------------------------------------------
+## ----backbone-----------------------------------------------------------------
 bb <- backbone(edges, alpha = 0.05)
 nrow(bb)
-head(bb, 5)
 
-## -----------------------------------------------------------------------------
+## ----temporal-----------------------------------------------------------------
 tn <- temporal_network(oa, author_network, "collaboration", window = 3)
 names(tn)
 
-## -----------------------------------------------------------------------------
-tn_slide <- temporal_network(
-  oa,
-  author_network,
-  "collaboration",
-  window = 3,
-  step = 1,
-  strategy = "sliding"
-)
+## ----historiograph------------------------------------------------------------
+head(local_citations(sc), 5)
 
-names(tn_slide)
-
-## -----------------------------------------------------------------------------
-tn_cum <- temporal_network(
-  oa,
-  author_network,
-  "collaboration",
-  window = 3,
-  strategy = "cumulative"
-)
-
-names(tn_cum)
-
-## -----------------------------------------------------------------------------
-lcs <- local_citations(sc)
-head(lcs, 5)
-
-## -----------------------------------------------------------------------------
 h <- historiograph(sc, n = 10)
 h$nodes
 head(h$edges, 5)
 
-## -----------------------------------------------------------------------------
-edges <- keyword_network(sc, min_occur = 2)
-head(edges, 5)
+## ----parse-names--------------------------------------------------------------
+parse_names(c("Saqr, Mohammed", "WANG Y", "Mohammed Saqr"))
 
-## -----------------------------------------------------------------------------
-m <- to_matrix(edges)
+## ----export-------------------------------------------------------------------
+edges <- keyword_network(sc, min_occur = 2)
+
+m <- to_matrix(edges)            # sparse adjacency matrix
 m[1:4, 1:4]
 
-## -----------------------------------------------------------------------------
-gephi <- to_gephi(edges)
-head(gephi$nodes, 3)
+gephi <- to_gephi(edges)         # Gephi node/edge tables
 head(gephi$edges, 3)
 
-## -----------------------------------------------------------------------------
-xml <- to_graphml(edges)
-cat(substr(xml, 1, 300))
+cat(substr(to_graphml(edges), 1, 200))   # GraphML, no XML dependency
 
-## ----eval = FALSE-------------------------------------------------------------
-# if (requireNamespace("igraph", quietly = TRUE)) {
-#   g <- to_igraph(edges)
-# }
-# 
-# if (requireNamespace("tidygraph", quietly = TRUE)) {
-#   tg <- to_tbl_graph(edges)
-# }
-# 
-# if (requireNamespace("cograph", quietly = TRUE)) {
-#   cg <- to_cograph(edges)
-# }
+## ----attrs--------------------------------------------------------------------
+edges <- author_network(oa, type = "collaboration", counting = "harmonic")
+c(type     = attr(edges, "network_type"),
+  counting = attr(edges, "counting"),
+  sim      = attr(edges, "similarity"))
 
-## -----------------------------------------------------------------------------
-edges <- author_network(oa, "collaboration", counting = "harmonic")
-
-attr(edges, "network_type")
-attr(edges, "counting")
-attr(edges, "similarity")
-
-## -----------------------------------------------------------------------------
 summary(edges)
 
