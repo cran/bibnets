@@ -15,8 +15,9 @@ A data frame in the standard bibnets format: \code{id}, \code{title},
 plus list-columns \code{authors}, \code{references}, and \code{keywords}.
 }
 \description{
-Takes the output of \code{rcrossref::cr_works()} (the \verb{$data} tibble/data frame)
-and converts it to the standardized bibnets format.
+\code{read_crossref()} converts the output of \code{rcrossref::cr_works()} (the
+\verb{$data} tibble/data frame) to the standardized bibnets format. For
+exported files rather than data in R, use \code{\link[=read_biblio]{read_biblio()}}.
 }
 \examples{
 # Construct a minimal data frame matching the structure of
@@ -28,14 +29,11 @@ raw <- data.frame(
   container.title = c("Journal A", "Journal B"),
   is.referenced.by.count = c("3", "9"),
   type = c("journal-article", "journal-article"),
-  stringsAsFactors = FALSE
-)
-raw$author <- list(
-  data.frame(given = c("Jane", "Anne"),
-             family = c("Smith", "Jones"),
-             stringsAsFactors = FALSE),
-  data.frame(given = "Mark", family = "Davis", stringsAsFactors = FALSE)
+  author = I(list(
+    data.frame(given = c("Jane", "Anne"), family = c("Smith", "Jones")),
+    data.frame(given = "Mark", family = "Davis")
+  ))
 )
 data <- read_crossref(raw)
-head(data[, c("id", "title", "year", "journal")])
+subset(data, select = c(id, title, year, journal, authors))
 }

@@ -32,9 +32,9 @@ multiple given names become concatenated initials
 a comma are always \code{"Last, First"}). One of:
 \describe{
 \item{\code{"auto"}}{(default) surname-first when the trailing token
-looks like initials — an all-uppercase token of 1-3 letters,
-the Scopus / bibnets signature (\code{"WANG Y"} -> \code{"Y Wang"}'s
-components). Otherwise treated as \code{"First Last"}. This is the
+looks like initials (an all-uppercase token of 1-3 letters),
+the Scopus / bibnets signature: \code{"WANG Y"} is read as surname
+\code{WANG}, given \code{Y}. Otherwise treated as \code{"First Last"}. This is the
 "bibnets takes precedence" bias: native bibnets/Scopus labels
 parse correctly with no extra arguments, while ordinary
 mixed-case \code{"First Last"} input is never misread.}
@@ -56,18 +56,18 @@ of \code{"person"}, \code{"organization"}, \code{"empty"}, \code{"missing"}). Ca
 the input is preserved; periods are stripped from parsed initials.
 }
 \description{
-Converts author names to \code{"First Last"} order and breaks each name
-into its components. The parser is aware of nobiliary particles
-(\code{van}, \code{von}, \code{de}, \code{del}, \code{da}, \code{der}, ...) and generational
-suffixes (\code{Jr}, \code{Sr}, \code{II}, \code{III}, \code{IV}), and is case-insensitive so
-it handles bibnets' uppercased entity labels.
+\code{parse_names()} converts author names to \code{"First Last"} order (or another
+\code{format}) and breaks each name into its components. The parser is aware of
+nobiliary particles (\code{van}, \code{von}, \code{de}, \code{del}, \code{da}, \code{der}, ...) and
+generational suffixes (\code{Jr}, \code{Sr}, \code{II}, \code{III}, \code{IV}), and is
+case-insensitive so it handles bibnets' uppercased entity labels.
 }
 \details{
 Three name conventions are recognised:
 \itemize{
-\item \code{"Last, First"} (a comma) — always parsed as surname-then-given.
+\item \code{"Last, First"} (a comma): always parsed as surname-then-given.
 \item \code{"SURNAME Initials"} (no comma, e.g. \code{"WANG Y"},
-\code{"AYALA-ROMERO JA"}) — the Scopus / bibnets author-label form.
+\code{"AYALA-ROMERO JA"}): the Scopus / bibnets author-label form.
 \item \code{"First Last"} (no comma, e.g. \code{"Mohammed Saqr"}).
 }
 Comma-less strings that look like group or corporate authors
@@ -80,7 +80,7 @@ choose to apply this function yourself first.
 }
 \section{Input shape}{
 \code{parse_names()} takes a \strong{flat character vector} (one name per
-element) — not a data frame and not a list. bibnets readers store
+element), not a data frame and not a list. bibnets readers store
 authors as a \strong{list-column} (each element is a character vector,
 because a paper has a variable number of authors), so map the
 function over it rather than passing the column directly:
@@ -138,9 +138,8 @@ parse_names("Saqr, Mohammed", format = "last_initials")  # "Saqr M."
 parse_names("Saqr, Mohammed", format = "last")            # "Saqr"
 parse_names("van der Berg, Jan", format = "last_initials") # "van der Berg J."
 
-x <- parse_names("Saqr, M.")
-x
-attr(x, "parts")
+# The parsed components travel in the "parts" attribute
+str(parse_names("Saqr, M."))
 
 # Particles and suffixes
 parse_names(c("van der Berg, Jan", "Smith, John, Jr.", "de la Cruz, Ana"))
@@ -156,15 +155,17 @@ parse_names("Wang Yong", surname_first = "yes")          # "Yong Wang"
 parse_names("WHO Collaborating Group")
 
 # Recommended workflow: normalise the authors list-column, then build
-papers <- data.frame(id = c("P1", "P2", "P3"), stringsAsFactors = FALSE)
-papers$authors <- list(
-  c("Saqr, Mohammed", "Lopez, Ana"),
-  c("SAQR M",         "Lopez, Ana"),
-  c("Saqr, Mohammed", "Chen, Wei"))
+papers <- data.frame(
+  id = c("P1", "P2", "P3"),
+  authors = I(list(
+    c("Saqr, Mohammed", "Lopez, Ana"),
+    c("SAQR M",         "Lopez, Ana"),
+    c("Saqr, Mohammed", "Chen, Wei")
+  ))
+)
 papers$authors <- lapply(papers$authors, parse_names,
                          format = "last_initials")
-net <- author_network(papers, type = "collaboration")
-net
+author_network(papers, type = "collaboration")
 }
 \seealso{
 \code{\link[=author_network]{author_network()}} and \code{\link[=read_biblio]{read_biblio()}} for the upstream

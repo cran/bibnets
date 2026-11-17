@@ -1,7 +1,15 @@
 #' Construct a co-occurrence network via two-mode multiplication
 #'
-#' The unified engine for all bibliometric networks. Operates entirely in
-#' sparse representation — never allocates a dense n x n matrix.
+#' `multiply_bipartite()` projects a weighted works x entities matrix onto a
+#' one-mode co-occurrence network and returns its edges. With
+#' `mode = "columns"` it links the entities (columns) that occur in the same
+#' rows (`crossprod(B)`, e.g. co-citation); with `mode = "rows"` it links
+#' the rows that share entities (`tcrossprod(B)`, e.g. coupling).
+#'
+#' It is the unified engine for all bibliometric networks. It operates
+#' entirely in sparse representation and never allocates a dense n x n
+#' matrix; `top_n` keeps the most frequent nodes, `similarity` normalizes
+#' the projection with [normalize()], and `threshold` drops weak edges.
 #'
 #' @param B A sparse bipartite matrix (works x entities), already weighted
 #'   by the counting method.
@@ -11,6 +19,8 @@
 #' @param threshold Numeric. Minimum edge weight to retain.
 #' @param top_n Integer or `NULL`. If specified, keep only the top `n`
 #'   most frequent nodes and return all edges among them.
+#' @param self_loops Logical. Keep diagonal entries as self-loops. Only
+#'   honoured with `similarity = "none"`.
 #'
 #' @return A data frame with columns `from`, `to`, `weight`, `count`.
 #' @keywords internal

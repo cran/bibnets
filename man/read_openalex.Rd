@@ -18,8 +18,10 @@ A data frame in the standard bibnets format: \code{id}, \code{title},
 plus list-columns \code{authors}, \code{references}, and \code{keywords}.
 }
 \description{
-Takes the output of \code{\link[openalexR:oa_fetch]{openalexR::oa_fetch()}} (a tibble/data frame of works)
-and converts it to the standardized bibnets format with list-columns.
+\code{read_openalex()} converts the output of \code{\link[openalexR:oa_fetch]{openalexR::oa_fetch()}} (a
+tibble/data frame of works) to the standardized bibnets format with
+list-columns. For a flat CSV downloaded from the OpenAlex website, use
+\code{\link[=read_openalex_csv]{read_openalex_csv()}}.
 }
 \examples{
 # Construct a minimal data frame matching the structure returned by
@@ -32,14 +34,12 @@ raw <- data.frame(
   so = c("Journal A", "Journal B"),
   doi = c("https://doi.org/10.1/a", "https://doi.org/10.2/b"),
   cited_by_count = c(5L, 12L),
-  stringsAsFactors = FALSE
+  author = I(list(
+    data.frame(au_display_name = c("Smith J", "Jones A")),
+    data.frame(au_display_name = "Davis M")
+  )),
+  referenced_works = I(list(c("W100", "W200"), "W123"))
 )
-raw$author <- list(
-  data.frame(au_display_name = c("Smith J", "Jones A"),
-             stringsAsFactors = FALSE),
-  data.frame(au_display_name = "Davis M", stringsAsFactors = FALSE)
-)
-raw$referenced_works <- list(c("W100", "W200"), "W123")
 data <- read_openalex(raw)
-head(data[, c("id", "title", "year", "journal", "doi")])
+subset(data, select = c(id, title, year, doi, authors, references))
 }

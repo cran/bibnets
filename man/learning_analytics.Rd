@@ -21,9 +21,9 @@ the OpenAlex flat export; one name per authorship slot).}
 \item{keywords}{List-column with one element: the primary OpenAlex
 topic for the work (e.g. \code{"Online Learning and Analytics"}).}
 \item{affiliations}{List-column of institution display names (one
-entry per authorship–institution pair).}
+entry per authorship-institution pair).}
 \item{countries}{List-column of two-letter ISO country codes (one
-entry per authorship–institution pair).}
+entry per authorship-institution pair).}
 }
 }
 \source{
@@ -33,11 +33,11 @@ OpenAlex \url{https://openalex.org}, CC0 licence.
 learning_analytics
 }
 \description{
-A corpus of 1,508 gold open-access scholarly works on learning analytics,
-retrieved from OpenAlex (CC0 licence). All records have a verified title,
-publication year, and at least one author. Journal names are present for
-works published in a named source; preprints and book chapters may have
-\code{NA} in \code{journal}.
+\code{learning_analytics} is a corpus of 1,508 gold open-access scholarly works on
+learning analytics, retrieved from OpenAlex (CC0 licence). All records have a
+verified title, publication year, and at least one author. Journal names are
+present for works published in a named source; preprints and book chapters
+may have \code{NA} in \code{journal}.
 }
 \examples{
 data(learning_analytics)

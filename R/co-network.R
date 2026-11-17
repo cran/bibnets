@@ -1,30 +1,43 @@
 #' Build a co-occurrence network from any field
 #'
-#' With one field, entities are linked when they co-occur in the same
-#' document. With `by`, entities are linked when they share values of the
-#' `by` field across documents.
+#' `conetwork()` builds a network between the values of any column. With one
+#' field, entities are linked when they co-occur in the same document. With
+#' `by`, entities are linked when they share values of the `by` field across
+#' documents; for example, journals linked by shared references form a
+#' journal coupling network.
 #'
 #' Fields can be list-columns (already split) or character columns with
-#' delimiters (auto-split via `sep`).
+#' delimiters (auto-split via `sep`). Edges are weighted by one of four
+#' position-independent counting methods and optionally normalized with
+#' `similarity`. It returns a `bibnets_network` edge list by default. The
+#' dedicated builders, such as [author_network()] (which adds
+#' position-dependent counting) and [keyword_network()], cover the standard
+#' bibliometric networks.
 #'
-#' @param data A data frame with column `id` and the specified field(s).
-#' @param field Character. The entity field — determines what the nodes are.
+#' @param data A data frame with one row per work and the specified
+#'   field(s). An `id` column is optional (see `id`).
+#' @param field Character. The entity field; its values become the nodes.
 #' @param by Character or `NULL`. What links the nodes. If `NULL` (default),
 #'   entities are linked by co-occurring in the same document. If specified,
 #'   entities are linked when they share values from the `by` field.
-#' @param sep Character or `NULL`. Delimiter for splitting character columns.
-#'   Default `";"`. Set to `NULL` if columns are already list-columns.
-#' @param counting Character. Counting method. Default `"full"`.
+#' @param sep Character or `NULL`. Delimiter for splitting character columns
+#'   (applied to both `field` and `by`). Default `";"`. List-columns are
+#'   never split. `NULL` keeps each character value as a single entity.
+#' @param counting Character. Counting method: `"full"` (default),
+#'   `"fractional"`, `"paper"` or `"strength"`.
 #' @param similarity Character. Normalization method. Default `"none"`.
-#' @param threshold Numeric. Minimum edge weight. Default 0.
+#' @param threshold Numeric. Minimum edge weight; edges with
+#'   `weight < threshold` are dropped. Default 0 (keep all).
 #' @param min_occur Integer. Minimum entity frequency. Default 1.
-#' @param top_n Integer or NULL. Return only the top n edges by weight.
-#'   Default NULL (all edges).
+#' @param top_n Integer or NULL. Keep only the `top_n` most frequent nodes
+#'   and return the edges among them. Default `NULL` (all nodes).
 #' @inheritParams author_network
 #'
-#' @return Depends on `format`: a `bibnets_network` data frame (default),
-#'   a Gephi-ready data frame, an igraph graph, a cograph_network, or a
-#'   sparse matrix.
+#' @return Depends on `format`. The default `"edgelist"` returns a
+#'   `bibnets_network` data frame with one row per undirected edge, columns
+#'   `from`, `to`, `weight` and `count`, sorted by decreasing `weight`, and
+#'   attributes `network_type`, `counting` and `similarity`. See
+#'   [author_network()] for the other formats.
 #'
 #' @export
 #' @examples
@@ -100,6 +113,13 @@ conetwork <- function(data,
 
 
 #' Build a network where entities share values from another field
+#'
+#' `build_by_network()` builds the network behind `conetwork(by = ...)`:
+#' two entities of `field` are linked when they share values of the `by`
+#' field across documents. It pools each entity's `by` values, builds an
+#' entities x values two-mode matrix and projects it onto the entities,
+#' returning an edge data frame with columns `from`, `to`, `weight` and
+#' `count`.
 #' @keywords internal
 build_by_network <- function(data, field, by, counting, similarity,
                               threshold, min_occur, top_n = NULL,
@@ -173,6 +193,12 @@ build_by_network <- function(data, field, by, counting, similarity,
 
 #' Ensure a column is a list-column, splitting if needed
 #'
+#' `ensure_list_column()` turns a column into a list-column. A character
+#' column is split on `sep` with [split_field()] (with a warning from
+#' [warn_if_sep_mismatch()] when the separator looks wrong); with
+#' `sep = NULL` each value becomes a single entity. A list-column is kept as
+#' it is. It returns `data` with the column replaced.
+#'
 #' @param strip_quotes Logical. If `TRUE` (default), surrounding quote
 #'   characters and whitespace are removed from every entity (e.g. a
 #'   quoted CSV value `"Alice"` becomes `Alice`). See
@@ -196,10 +222,11 @@ ensure_list_column <- function(data, field, sep = ";", strip_quotes = TRUE) {
 
 #' Warn when a separator likely failed to split a multi-entity column
 #'
-#' Splitting with the wrong separator silently yields one "entity" per row
-#' (e.g., a whole author byline as a single node). Heuristic: no row split
-#' into more than one entity, yet most non-empty strings contain a common
-#' *structural* delimiter.
+#' `warn_if_sep_mismatch()` warns when a separator likely failed to split a
+#' multi-entity column. Splitting with the wrong separator silently yields
+#' one "entity" per row (e.g., a whole author byline as a single node).
+#' Heuristic: no row split into more than one entity, yet most non-empty
+#' strings contain a common *structural* delimiter.
 #'
 #' Only structural delimiters (`";"`, `"|"`, tab) are considered, because
 #' they essentially never occur inside a single legitimate label. Commas

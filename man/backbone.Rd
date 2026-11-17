@@ -13,22 +13,28 @@ Must be an undirected edge list (each pair appears once).}
 \item{alpha}{Numeric. Significance threshold in (0, 1). Default \code{0.05}.}
 }
 \value{
-The filtered edge data frame with an added \code{alpha} column (the
-minimum alpha from the two endpoints).
+The input edge data frame (same class and columns) restricted to
+the retained edges, with an added numeric \code{alpha} column (the smaller
+of the two endpoint alphas), one row per retained edge, sorted by
+decreasing \code{weight}.
 }
 \description{
-Applies the disparity filter to a weighted edge list. For each edge, it
-computes an alpha (p-value) from both endpoints and keeps the edge if it
-is statistically significant from at least one endpoint.
+\code{backbone()} extracts the backbone of a weighted edge list with the
+disparity filter (Serrano et al., 2009). For each edge, it computes an
+alpha (p-value) from both endpoints and keeps the edge if it is
+statistically significant from at least one endpoint.
 }
 \details{
-The null model asks: given that node \eqn{i} has total strength \eqn{s_i}
-distributed uniformly across \eqn{k_i} edges, what is the probability that
-a single edge weight is as large as \eqn{w_{ij}}? The answer is
+Under the null model, the total strength \eqn{s_i} of node \eqn{i} is
+distributed uniformly across its \eqn{k_i} edges; the probability that a
+single edge weight is as large as \eqn{w_{ij}} is then
 \deqn{\alpha_{ij} = \left(1 - \frac{w_{ij}}{s_i}\right)^{k_i - 1}}
 
 An edge is retained if \eqn{\min(\alpha_{ij}, \alpha_{ji}) < \alpha}.
 Nodes with only one edge always have \eqn{\alpha = 0} and are always kept.
+It returns the retained edges with their \code{alpha}. To prune by a fixed
+weight cut-off or a per-node edge count instead, use \code{\link[=prune]{prune()}}; to keep
+the edges among the most connected nodes, use \code{\link[=filter_top]{filter_top()}}.
 }
 \examples{
 edges <- data.frame(
@@ -37,4 +43,10 @@ edges <- data.frame(
   weight = c(10,   1,   1,   8,   1)
 )
 backbone(edges, alpha = 0.05)
+}
+\references{
+Serrano, M. A., Boguna, M., & Vespignani, A. (2009). Extracting the
+multiscale backbone of complex weighted networks. \emph{Proceedings of the
+National Academy of Sciences}, 106(16), 6483--6488.
+\doi{10.1073/pnas.0808904106}
 }

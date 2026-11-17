@@ -24,7 +24,7 @@ author_network(papers, attention = "lead")
 author_network(papers, attention = "last")
 
 ## ----label--------------------------------------------------------------------
-attr(author_network(papers, attention = "proximity"), "counting")
+author_network(papers, attention = "proximity")
 
 ## ----where, eval = FALSE------------------------------------------------------
 # author_network(data, attention = "lead")

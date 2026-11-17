@@ -31,21 +31,23 @@ data.frame(
 )
 
 ## -----------------------------------------------------------------------------
-x <- parse_names(c("van der Berg, Jan", "Smith, John, Jr."))
-attr(x, "parts")
+str(parse_names(c("van der Berg, Jan", "Smith, John, Jr.")))
 
 ## -----------------------------------------------------------------------------
-papers <- data.frame(id = c("P1", "P2", "P3"), stringsAsFactors = FALSE)
-papers$authors <- list(
-  c("Saqr, Mohammed", "Lopez, Ana"),
-  c("SAQR M",         "Lopez, Ana"),
-  c("Saqr, Mohammed", "Chen, Wei"))
-papers$authors
+papers <- data.frame(
+  id = c("P1", "P2", "P3"),
+  authors = I(list(
+    c("Saqr, Mohammed", "Lopez, Ana"),
+    c("SAQR M",         "Lopez, Ana"),
+    c("Saqr, Mohammed", "Chen, Wei")
+  ))
+)
+str(papers)
 
 ## -----------------------------------------------------------------------------
 papers$authors <- lapply(papers$authors, parse_names,
                           format = "last_initials")
-papers$authors
+papers
 
 ## -----------------------------------------------------------------------------
 parse_names(c("WANG Y", "AYALA-ROMERO JA"))
@@ -57,9 +59,4 @@ net
 ## -----------------------------------------------------------------------------
 class(net)
 is.data.frame(net)
-
-## -----------------------------------------------------------------------------
-net$from <- as.vector(parse_names(net$from, format = "last"))
-net$to   <- as.vector(parse_names(net$to,   format = "last"))
-net
 

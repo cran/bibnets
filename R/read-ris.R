@@ -1,7 +1,8 @@
 #' Read an RIS file
 #'
-#' Parses a `.ris` file into a standardized bibliometric data frame.
-#' Like BibTeX, standard RIS does not include cited references.
+#' `read_ris()` parses a `.ris` file into a standardized bibliometric data
+#' frame. Like BibTeX, standard RIS does not include cited references.
+#' [read_biblio()] reads several files at once and detects the format.
 #'
 #' @param file Path to a `.ris` file.
 #' @param encoding Character. File encoding. Default `"UTF-8"`.
@@ -25,7 +26,7 @@
 #' f <- tempfile(fileext = ".ris")
 #' writeLines(ris, f)
 #' data <- read_ris(f)
-#' data[, c("id", "title", "year", "journal", "doi")]
+#' subset(data, select = c(id, title, year, journal, doi, authors))
 #' unlink(f)
 read_ris <- function(file, encoding = "UTF-8") {
   check_file(file)

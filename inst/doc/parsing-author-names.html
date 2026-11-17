@@ -353,8 +353,9 @@ things:</p>
 as the <code>&quot;parts&quot;</code> attribute.</li>
 </ol>
 <p>It is <strong>not</strong> called by any reader or network builder.
-bibnets matches entity labels verbatim; you opt in to normalisation by
-calling this function yourself.</p>
+bibnets matches entity labels verbatim (after trimming and
+upper-casing); you opt in to normalisation by calling this function
+yourself.</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">parse_names</span>(<span class="fu">c</span>(<span class="st">&quot;Saqr, Mohammed&quot;</span>, <span class="st">&quot;Lopez-Pernas, Sonsoles&quot;</span>))</span>
 <span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Mohammed Saqr&quot;         &quot;Sonsoles Lopez-Pernas&quot;</span></span>
 <span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;parts&quot;)</span></span>
@@ -465,12 +466,20 @@ left untouched:</p>
 <div id="the-parts-attribute" class="section level2">
 <h2>The <code>&quot;parts&quot;</code> attribute</h2>
 <p>The parsed components ride along on every call, independent of
-<code>format</code>:</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>x <span class="ot">&lt;-</span> <span class="fu">parse_names</span>(<span class="fu">c</span>(<span class="st">&quot;van der Berg, Jan&quot;</span>, <span class="st">&quot;Smith, John, Jr.&quot;</span>))</span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="fu">attr</span>(x, <span class="st">&quot;parts&quot;</span>)</span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="co">#&gt;            original first  last particle suffix   type</span></span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="co">#&gt; 1 van der Berg, Jan   Jan  Berg  van der   &lt;NA&gt; person</span></span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="co">#&gt; 2  Smith, John, Jr.  John Smith     &lt;NA&gt;     Jr person</span></span></code></pre></div>
+<code>format</code>, and <code>str()</code> shows them next to the
+formatted names:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="fu">str</span>(<span class="fu">parse_names</span>(<span class="fu">c</span>(<span class="st">&quot;van der Berg, Jan&quot;</span>, <span class="st">&quot;Smith, John, Jr.&quot;</span>)))</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="co">#&gt;  chr [1:2] &quot;Jan van der Berg&quot; &quot;John Smith Jr&quot;</span></span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="co">#&gt;  - attr(*, &quot;parts&quot;)=&#39;data.frame&#39;:    2 obs. of  6 variables:</span></span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="co">#&gt;   ..$ original: chr [1:2] &quot;van der Berg, Jan&quot; &quot;Smith, John, Jr.&quot;</span></span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="co">#&gt;   ..$ first   : chr [1:2] &quot;Jan&quot; &quot;John&quot;</span></span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="co">#&gt;   ..$ last    : chr [1:2] &quot;Berg&quot; &quot;Smith&quot;</span></span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a><span class="co">#&gt;   ..$ particle: chr [1:2] &quot;van der&quot; NA</span></span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a><span class="co">#&gt;   ..$ suffix  : chr [1:2] NA &quot;Jr&quot;</span></span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a><span class="co">#&gt;   ..$ type    : chr [1:2] &quot;person&quot; &quot;person&quot;</span></span></code></pre></div>
+<p>The particle (<code>van der</code>) and the suffix (<code>Jr</code>)
+are split off from the surname, so <code>last</code> holds
+<code>Berg</code> and <code>Smith</code> alone.</p>
 <p><code>type</code> is one of <code>&quot;person&quot;</code>,
 <code>&quot;organization&quot;</code>, <code>&quot;empty&quot;</code>,
 <code>&quot;missing&quot;</code>.</p>
@@ -482,44 +491,30 @@ vector</strong>. It is not a data-frame function.</p>
 <p>bibnets readers store authors as a <strong>list-column</strong>: each
 paper has a variable number of authors, so the cell holds a
 <em>vector</em>, not a single string.</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>papers <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">id =</span> <span class="fu">c</span>(<span class="st">&quot;P1&quot;</span>, <span class="st">&quot;P2&quot;</span>, <span class="st">&quot;P3&quot;</span>), <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>papers<span class="sc">$</span>authors <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;Saqr, Mohammed&quot;</span>, <span class="st">&quot;Lopez, Ana&quot;</span>),</span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;SAQR M&quot;</span>,         <span class="st">&quot;Lopez, Ana&quot;</span>),</span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;Saqr, Mohammed&quot;</span>, <span class="st">&quot;Chen, Wei&quot;</span>))</span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>papers<span class="sc">$</span>authors</span>
-<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a><span class="co">#&gt; [[1]]</span></span>
-<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Saqr, Mohammed&quot; &quot;Lopez, Ana&quot;    </span></span>
-<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a><span class="co">#&gt; [[2]]</span></span>
-<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a><span class="co">#&gt; [1] &quot;SAQR M&quot;     &quot;Lopez, Ana&quot;</span></span>
-<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a><span class="co">#&gt; [[3]]</span></span>
-<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Saqr, Mohammed&quot; &quot;Chen, Wei&quot;</span></span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>papers <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>  <span class="at">id =</span> <span class="fu">c</span>(<span class="st">&quot;P1&quot;</span>, <span class="st">&quot;P2&quot;</span>, <span class="st">&quot;P3&quot;</span>),</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  <span class="at">authors =</span> <span class="fu">I</span>(<span class="fu">list</span>(</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>    <span class="fu">c</span>(<span class="st">&quot;Saqr, Mohammed&quot;</span>, <span class="st">&quot;Lopez, Ana&quot;</span>),</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>    <span class="fu">c</span>(<span class="st">&quot;SAQR M&quot;</span>,         <span class="st">&quot;Lopez, Ana&quot;</span>),</span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>    <span class="fu">c</span>(<span class="st">&quot;Saqr, Mohammed&quot;</span>, <span class="st">&quot;Chen, Wei&quot;</span>)</span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>  ))</span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>)</span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a><span class="fu">str</span>(papers)</span>
+<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a><span class="co">#&gt; &#39;data.frame&#39;:    3 obs. of  2 variables:</span></span>
+<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a><span class="co">#&gt;  $ id     : chr  &quot;P1&quot; &quot;P2&quot; &quot;P3&quot;</span></span>
+<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a><span class="co">#&gt;  $ authors:List of 3</span></span>
+<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a><span class="co">#&gt;   ..$ : chr  &quot;Saqr, Mohammed&quot; &quot;Lopez, Ana&quot;</span></span>
+<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a><span class="co">#&gt;   ..$ : chr  &quot;SAQR M&quot; &quot;Lopez, Ana&quot;</span></span>
+<span id="cb8-15"><a href="#cb8-15" tabindex="-1"></a><span class="co">#&gt;   ..$ : chr  &quot;Saqr, Mohammed&quot; &quot;Chen, Wei&quot;</span></span>
+<span id="cb8-16"><a href="#cb8-16" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;class&quot;)= chr &quot;AsIs&quot;</span></span></code></pre></div>
 <p>Map the function over the list-column with <code>lapply()</code>:</p>
 <div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>papers<span class="sc">$</span>authors <span class="ot">&lt;-</span> <span class="fu">lapply</span>(papers<span class="sc">$</span>authors, parse_names,</span>
 <span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>                          <span class="at">format =</span> <span class="st">&quot;last_initials&quot;</span>)</span>
-<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>papers<span class="sc">$</span>authors</span>
-<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a><span class="co">#&gt; [[1]]</span></span>
-<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Saqr M.&quot;  &quot;Lopez A.&quot;</span></span>
-<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;parts&quot;)</span></span>
-<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a><span class="co">#&gt;         original    first  last particle suffix   type</span></span>
-<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a><span class="co">#&gt; 1 Saqr, Mohammed Mohammed  Saqr     &lt;NA&gt;   &lt;NA&gt; person</span></span>
-<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a><span class="co">#&gt; 2     Lopez, Ana      Ana Lopez     &lt;NA&gt;   &lt;NA&gt; person</span></span>
-<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a><span class="co">#&gt; [[2]]</span></span>
-<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a><span class="co">#&gt; [1] &quot;SAQR M.&quot;  &quot;Lopez A.&quot;</span></span>
-<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;parts&quot;)</span></span>
-<span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a><span class="co">#&gt;     original first  last particle suffix   type</span></span>
-<span id="cb9-15"><a href="#cb9-15" tabindex="-1"></a><span class="co">#&gt; 1     SAQR M     M  SAQR     &lt;NA&gt;   &lt;NA&gt; person</span></span>
-<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a><span class="co">#&gt; 2 Lopez, Ana   Ana Lopez     &lt;NA&gt;   &lt;NA&gt; person</span></span>
-<span id="cb9-17"><a href="#cb9-17" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb9-18"><a href="#cb9-18" tabindex="-1"></a><span class="co">#&gt; [[3]]</span></span>
-<span id="cb9-19"><a href="#cb9-19" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Saqr M.&quot; &quot;Chen W.&quot;</span></span>
-<span id="cb9-20"><a href="#cb9-20" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;parts&quot;)</span></span>
-<span id="cb9-21"><a href="#cb9-21" tabindex="-1"></a><span class="co">#&gt;         original    first last particle suffix   type</span></span>
-<span id="cb9-22"><a href="#cb9-22" tabindex="-1"></a><span class="co">#&gt; 1 Saqr, Mohammed Mohammed Saqr     &lt;NA&gt;   &lt;NA&gt; person</span></span>
-<span id="cb9-23"><a href="#cb9-23" tabindex="-1"></a><span class="co">#&gt; 2      Chen, Wei      Wei Chen     &lt;NA&gt;   &lt;NA&gt; person</span></span></code></pre></div>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>papers</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a><span class="co">#&gt;   id           authors</span></span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="co">#&gt; 1 P1 Saqr M., Lopez A.</span></span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a><span class="co">#&gt; 2 P2 SAQR M., Lopez A.</span></span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a><span class="co">#&gt; 3 P3  Saqr M., Chen W.</span></span></code></pre></div>
 <p>A flat character column (or a network’s <code>from</code> /
 <code>to</code>) is called directly, no <code>lapply()</code>:</p>
 <div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="fu">parse_names</span>(<span class="fu">c</span>(<span class="st">&quot;WANG Y&quot;</span>, <span class="st">&quot;AYALA-ROMERO JA&quot;</span>))</span>
@@ -559,26 +554,23 @@ merge by relabelling.</p>
 <span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;bibnets_network&quot; &quot;data.frame&quot;</span></span>
 <span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a><span class="fu">is.data.frame</span>(net)</span>
 <span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
-<p>You <em>can</em> relabel <code>from</code> / <code>to</code>
-directly, but <code>parse_names()</code> is graph-blind. Edges, pairing,
-<code>weight</code> and <code>count</code> are preserved, but:</p>
+<p>Relabelling its <code>from</code> / <code>to</code> columns after the
+build is possible, but <code>parse_names()</code> is graph-blind. Edges,
+pairing, <code>weight</code> and <code>count</code> are preserved,
+but:</p>
 <ul>
-<li>Apply the <strong>same call to both</strong> endpoint columns, or
-the two ends use different labels.</li>
+<li>The <strong>same call</strong> has to be applied to both endpoint
+columns, or the two ends use different labels.</li>
 <li>The mapping is <strong>many-to-one</strong>: distinct authors can
 collapse onto one label (especially <code>&quot;last_initials&quot;</code>), and
 bibnets does <strong>not</strong> re-aggregate the resulting duplicate
-edges.</li>
+edges, so two rows can then describe the same pair with split
+weights.</li>
 </ul>
-<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>net<span class="sc">$</span>from <span class="ot">&lt;-</span> <span class="fu">as.vector</span>(<span class="fu">parse_names</span>(net<span class="sc">$</span>from, <span class="at">format =</span> <span class="st">&quot;last&quot;</span>))</span>
-<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>net<span class="sc">$</span>to   <span class="ot">&lt;-</span> <span class="fu">as.vector</span>(<span class="fu">parse_names</span>(net<span class="sc">$</span>to,   <span class="at">format =</span> <span class="st">&quot;last&quot;</span>))</span>
-<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>net</span>
-<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a><span class="co">#&gt; # bibnets network: author_collaboration | 3 nodes · 2 edges | counting: full </span></span>
-<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a><span class="co">#&gt;    from   to    weight  count</span></span>
-<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a><span class="co">#&gt; 1  LOPEZ  SAQR       2      2</span></span>
-<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a><span class="co">#&gt; 2  CHEN   SAQR       1      1</span></span></code></pre></div>
-<p>Use <code>as.vector()</code> when assigning back so the
-<code>&quot;parts&quot;</code> attribute is not carried on the column.</p>
+<p>Normalising the <code>authors</code> column before
+<code>author_network()</code>, as above, avoids both problems: the merge
+happens before projection, so every count and weight is computed on the
+merged node.</p>
 </div>
 <div id="limitations" class="section level2">
 <h2>Limitations</h2>

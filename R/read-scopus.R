@@ -1,7 +1,9 @@
 #' Read Scopus CSV export
 #'
-#' Parses a CSV file exported from Scopus into a standardized bibliometric
-#' data frame with list-columns for multi-valued fields.
+#' `read_scopus()` parses a CSV file exported from Scopus into a
+#' standardized bibliometric data frame with list-columns for multi-valued
+#' fields.
+#' [read_biblio()] reads several files at once and detects the format.
 #'
 #' @param file Path to a Scopus CSV export file.
 #' @param encoding Character. File encoding. Default `"UTF-8"`.
@@ -16,7 +18,7 @@
 #' @examples
 #' f <- system.file("extdata", "scopus_sample.csv", package = "bibnets")
 #' data <- read_scopus(f)
-#' head(data[, c("id", "title", "year", "journal")])
+#' subset(data, select = c(id, title, year, journal, authors))
 read_scopus <- function(file, encoding = "UTF-8") {
   check_file(file)
 

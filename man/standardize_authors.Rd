@@ -10,15 +10,16 @@ standardize_authors(x, flip_names = FALSE)
 \item{x}{Character vector of author names.}
 
 \item{flip_names}{Logical. If \code{TRUE}, names in \verb{Last, First} format are
-reordered to \verb{First Last}. Off by default — enable only when all names
+reordered to \verb{First Last}. Off by default; enable only when all names
 in \code{x} reliably follow the \verb{Last, First} convention.}
 }
 \value{
 Character vector, uppercased and cleaned.
 }
 \description{
-Uppercase, whitespace normalisation, and dot removal from initials
-(\code{F.J.} → \code{FJ}). Name order and format are preserved — consistent with
-how bibliometrix handles multi-source data.
+\code{standardize_authors()} cleans author names by uppercasing, whitespace
+normalisation, and dot removal from initials (\code{F.J.} -> \code{FJ}). Name
+order and format are preserved, consistent with how bibliometrix handles
+multi-source data. To reorder and parse names, use \code{\link[=parse_names]{parse_names()}}.
 }
 \keyword{internal}

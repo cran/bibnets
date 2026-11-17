@@ -10,20 +10,24 @@ to_cograph(edges, nodes = NULL, directed = FALSE)
 \item{edges}{A data frame with at least \code{from}, \code{to}, \code{weight} columns.}
 
 \item{nodes}{Optional data frame of node attributes with an \code{id} column
-(e.g., output of \code{\link[=local_citations]{local_citations()}}). All columns are merged into the
-\code{cograph_network$nodes} table and become available as aesthetic mappings.}
+(e.g., output of \code{\link[=local_citations]{local_citations()}}). All other columns are merged into
+the node table of the \code{cograph_network} and become available as
+aesthetic mappings.}
 
 \item{directed}{Logical. Default \code{FALSE}.}
 }
 \value{
-A \code{cograph_network} object (S3 list with \verb{$nodes} and \verb{$edges}).
+A \code{cograph_network} (a list whose \code{nodes} and \code{edges} components
+are data frames); with \code{nodes} supplied, its node table gains every
+non-\code{id} column of \code{nodes}, matched by node label (\code{NA} where a node
+has no metadata row).
 }
 \description{
-Converts a bibnets edge list to a \code{cograph_network} object by calling
-\code{cograph::as_cograph()}. Optionally merges node metadata (e.g., from
-\code{\link[=local_citations]{local_citations()}}) into the network's node table so attributes like
-\code{lcs} or \code{year} can be used directly in \code{splot()} aesthetic parameters
-(e.g., \code{node_size = "lcs"}).
+\code{to_cograph()} converts a bibnets edge list to a \code{cograph_network} object by
+calling \code{cograph::as_cograph()}. Optionally merges node metadata (e.g., from
+\code{\link[=local_citations]{local_citations()}}) into the network's node table so attributes like \code{lcs}
+or \code{year} can be used directly in \code{splot()} aesthetic parameters (e.g.,
+\code{node_size = "lcs"}).
 }
 \details{
 Note: bibnets edge lists (\code{from}, \code{to}, \code{weight}) are accepted directly
@@ -34,12 +38,11 @@ when you want to attach node-level metadata.
 \dontshow{if (requireNamespace("cograph", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 data(biblio_data)
 
-# Without metadata: splot() accepts bibnets edges directly
-edges <- author_network(biblio_data, "collaboration")
+# Without metadata
+to_cograph(author_network(biblio_data, "collaboration"))
 
-# With metadata: document network + local citation scores as node size
-edges <- document_network(biblio_data, type = "coupling")
-nodes <- local_citations(biblio_data)   # keyed by document id
-net   <- to_cograph(edges, nodes = nodes)
+# With metadata: local citation scores attached to a document network
+to_cograph(document_network(biblio_data, type = "coupling"),
+           nodes = local_citations(biblio_data))
 \dontshow{\}) # examplesIf}
 }

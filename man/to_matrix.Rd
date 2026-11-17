@@ -9,13 +9,17 @@ to_matrix(edges, symmetric = TRUE)
 \arguments{
 \item{edges}{A data frame with \code{from}, \code{to}, \code{weight} columns.}
 
-\item{symmetric}{Logical. If \code{TRUE} (default), produces a symmetric matrix.}
+\item{symmetric}{Logical. If \code{TRUE} (default), produces a symmetric matrix
+(each edge is entered in both directions).}
 }
 \value{
-A sparse Matrix.
+A square sparse \code{dgCMatrix} of edge weights with one row and
+column per node label (dimnames are the node labels).
 }
 \description{
-Convert edge data frame to adjacency matrix
+\code{to_matrix()} converts a bibnets edge list to a square sparse adjacency
+matrix of edge weights, one row and column per node. By default each edge
+is entered in both directions, so the matrix is symmetric.
 }
 \examples{
 data(biblio_data)

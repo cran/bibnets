@@ -1,7 +1,10 @@
 #' Read Web of Science plaintext or tab-delimited export
 #'
-#' Parses a Web of Science export file (plaintext or tab-delimited) into a
-#' standardized bibliometric data frame.
+#' `read_wos()` parses a Web of Science export file (plaintext or
+#' tab-delimited) into a standardized bibliometric data frame.
+#' [read_biblio()] reads several files at once and detects plaintext
+#' exports automatically; pass it `format = "wos_tab"` for tab-delimited
+#' files.
 #'
 #' @param file Path to a WoS export file (.txt).
 #' @param format Character. `"plaintext"` (default) for WoS tagged format,
@@ -16,7 +19,7 @@
 #' @examples
 #' f <- system.file("extdata", "wos_sample.txt", package = "bibnets")
 #' data <- read_wos(f)
-#' head(data[, c("id", "title", "year", "journal")])
+#' subset(data, select = c(id, title, year, journal, authors))
 read_wos <- function(file, format = "plaintext") {
   check_file(file)
   check_choice(format, c("plaintext", "tab"), "format")

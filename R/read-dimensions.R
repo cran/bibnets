@@ -1,7 +1,8 @@
 #' Read Dimensions CSV export
 #'
-#' Parses a CSV file exported from Dimensions into a standardized
-#' bibliometric data frame.
+#' `read_dimensions()` parses a CSV file exported from Dimensions into a
+#' standardized bibliometric data frame.
+#' [read_biblio()] reads several files at once and detects the format.
 #'
 #' @param file Path to a Dimensions CSV export file.
 #' @param encoding Character. File encoding. Default `"UTF-8"`.
@@ -16,7 +17,7 @@
 #' @examples
 #' f <- system.file("extdata", "dimensions_sample.csv", package = "bibnets")
 #' data <- read_dimensions(f)
-#' head(data[, c("id", "title", "year", "journal")])
+#' subset(data, select = c(id, title, year, journal, authors))
 read_dimensions <- function(file, encoding = "UTF-8") {
   check_file(file)
 

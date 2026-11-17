@@ -25,12 +25,10 @@ generic <- read_biblio(
   keywords = "primary_topic.display_name",
   sep      = "|"
 )
-generic$authors[[1]]
-generic$keywords[[1]]
+str(head(subset(generic, select = c(id, authors, keywords)), 2))
 
 ## ----custom-columns-----------------------------------------------------------
 papers <- data.frame(
-  id            = 1:4,
   `Author Names`= c("Smith J, Doe A, Lee K", "Smith J, Lee K",
                     "Doe A, Lee K", "Smith J, Doe A"),
   Tags          = c("ml, ai", "ml, nlp", "ai, nlp", "ml, ai"),
@@ -116,12 +114,10 @@ invisible(author_network(bad))          # warns: values contain "|"
 f <- system.file("extdata", "openalex_works.csv", package = "bibnets")
 oa <- read_openalex_csv(f)
 str(oa, max.level = 1)
-head(oa[, c("id", "title", "year", "journal", "type")], 5)
+head(subset(oa, select = c(id, title, year, journal, type)), 5)
 
 ## ----openalex-csv-lists-------------------------------------------------------
-oa$authors[[1]]
-oa$affiliations[[1]]
-oa$countries[[1]]
+str(head(subset(oa, select = c(id, authors, affiliations, countries)), 2))
 
 ## ----openalex-csv-networks----------------------------------------------------
 co <- country_network(oa, counting = "fractional")
@@ -137,22 +133,21 @@ df <- data.frame(
   id    = c("p1", "p2", "p3"),
   title = c("Paper A", "Paper B", "Paper C"),
   year  = c(2020L, 2021L, 2022L),
-  stringsAsFactors = FALSE
-)
-df$authors <- list(
-  c("ALICE", "BOB"),
-  c("BOB", "CAROL"),
-  c("ALICE", "CAROL", "DAVE")
-)
-df$references <- list(
-  c("R1", "R2"),
-  c("R1", "R3"),
-  c("R2", "R3", "R4")
-)
-df$keywords <- list(
-  c("graph", "network"),
-  c("network", "embedding"),
-  c("graph", "embedding", "neural")
+  authors = I(list(
+    c("ALICE", "BOB"),
+    c("BOB", "CAROL"),
+    c("ALICE", "CAROL", "DAVE")
+  )),
+  references = I(list(
+    c("R1", "R2"),
+    c("R1", "R3"),
+    c("R2", "R3", "R4")
+  )),
+  keywords = I(list(
+    c("graph", "network"),
+    c("network", "embedding"),
+    c("graph", "embedding", "neural")
+  ))
 )
 
 author_network(df, "collaboration")
@@ -164,17 +159,10 @@ split_field(c("Alice; Bob; Carol", "Dave; Eve"))
 split_field(c("a|b|c", "d|e"), sep = "|")
 
 ## ----combine-sources----------------------------------------------------------
-common <- c("id", "title", "year", "journal", "doi", "cited_by_count",
-            "abstract", "type", "authors", "references", "keywords")
-
-data(biblio_data)
-b1 <- biblio_data
-b2 <- biblio_data
-b2$id <- paste0(b2$id, "_dup")
-
-cols <- intersect(common, names(b1))
-combined <- rbind(b1[, cols], b2[, cols])
-nrow(combined)
+f_scopus <- system.file("extdata", "scopus_sample.csv", package = "bibnets")
+f_wos    <- system.file("extdata", "wos_sample.txt",    package = "bibnets")
+combined <- read_biblio(c(f_scopus, f_wos))
+str(combined, max.level = 1)
 
 ## ----sanity-check-------------------------------------------------------------
 data(scopus_quantum_cloud)
@@ -184,7 +172,7 @@ range(lengths(sc$authors))
 range(lengths(sc$references))
 range(lengths(sc$keywords))
 
-head(sort(table(sc$journal), decreasing = TRUE), 5)
-range(sc$year, na.rm = TRUE)
+summary(factor(sc$journal), maxsum = 6)
+range(sc$year)
 table(sc$type)
 

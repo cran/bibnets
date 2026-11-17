@@ -1,7 +1,8 @@
 #' Convert Crossref API data to bibnets format
 #'
-#' Takes the output of `rcrossref::cr_works()` (the `$data` tibble/data frame)
-#' and converts it to the standardized bibnets format.
+#' `read_crossref()` converts the output of `rcrossref::cr_works()` (the
+#' `$data` tibble/data frame) to the standardized bibnets format. For
+#' exported files rather than data in R, use [read_biblio()].
 #'
 #' @param data A data frame from `cr_works(...)$data`.
 #'
@@ -20,16 +21,13 @@
 #'   container.title = c("Journal A", "Journal B"),
 #'   is.referenced.by.count = c("3", "9"),
 #'   type = c("journal-article", "journal-article"),
-#'   stringsAsFactors = FALSE
-#' )
-#' raw$author <- list(
-#'   data.frame(given = c("Jane", "Anne"),
-#'              family = c("Smith", "Jones"),
-#'              stringsAsFactors = FALSE),
-#'   data.frame(given = "Mark", family = "Davis", stringsAsFactors = FALSE)
+#'   author = I(list(
+#'     data.frame(given = c("Jane", "Anne"), family = c("Smith", "Jones")),
+#'     data.frame(given = "Mark", family = "Davis")
+#'   ))
 #' )
 #' data <- read_crossref(raw)
-#' head(data[, c("id", "title", "year", "journal")])
+#' subset(data, select = c(id, title, year, journal, authors))
 read_crossref <- function(data) {
   stopifnot(is.data.frame(data))
 

@@ -1,3 +1,13 @@
+# bibnets 0.7.0
+
+* The help pages now state what the builders' arguments do: `top_n` keeps
+  the most frequent nodes (it was described as keeping the top edges);
+  `min_occur` is not applied with position-dependent counting or
+  `attention`; `self_loops` takes effect only with `similarity = "none"`;
+  `document_network(type = "co_citation")` links cited items, not
+  documents; `id` is optional on every builder.
+* New package help page, `?bibnets`.
+
 # bibnets 0.6.0
 
 ## Breaking changes

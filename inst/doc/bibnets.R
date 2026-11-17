@@ -41,7 +41,7 @@ author_network(papers, authors = "Author Names", sep = ",")
 ## ----schema-------------------------------------------------------------------
 data(scopus_quantum_cloud)
 sc <- scopus_quantum_cloud
-names(sc)[1:12]
+names(sc)
 
 ## ----data---------------------------------------------------------------------
 data(biblio_data)
@@ -100,10 +100,8 @@ head(conetwork(sc, "keywords", min_occur = 2), 3)
 head(conetwork(sc, "authors", by = "keywords", min_occur = 2), 3)
 
 ## ----normalize----------------------------------------------------------------
-none <- keyword_network(sc, min_occur = 2, similarity = "none")
-cos  <- keyword_network(sc, min_occur = 2, similarity = "cosine")
-head(none[, c("from", "to", "weight", "count")], 3)
-head(cos[,  c("from", "to", "weight", "count")], 3)
+head(keyword_network(sc, min_occur = 2, similarity = "none"), 3)
+head(keyword_network(sc, min_occur = 2, similarity = "cosine"), 3)
 
 ## ----reduce-------------------------------------------------------------------
 edges <- author_network(oa, type = "collaboration")
@@ -121,11 +119,9 @@ tn <- temporal_network(oa, author_network, "collaboration", window = 3)
 names(tn)
 
 ## ----historiograph------------------------------------------------------------
-head(local_citations(sc), 5)
+local_citations(small)
 
-h <- historiograph(sc, n = 10)
-h$nodes
-head(h$edges, 5)
+historiograph(small, n = 5)
 
 ## ----parse-names--------------------------------------------------------------
 parse_names(c("Saqr, Mohammed", "WANG Y", "Mohammed Saqr"))
@@ -133,19 +129,13 @@ parse_names(c("Saqr, Mohammed", "WANG Y", "Mohammed Saqr"))
 ## ----export-------------------------------------------------------------------
 edges <- keyword_network(sc, min_occur = 2)
 
-m <- to_matrix(edges)            # sparse adjacency matrix
-m[1:4, 1:4]
+dim(to_matrix(edges))            # sparse adjacency matrix, one row per keyword
 
-gephi <- to_gephi(edges)         # Gephi node/edge tables
-head(gephi$edges, 3)
+to_gephi(head(edges, 3))         # Gephi node and edge tables
 
 cat(substr(to_graphml(edges), 1, 200))   # GraphML, no XML dependency
 
 ## ----attrs--------------------------------------------------------------------
 edges <- author_network(oa, type = "collaboration", counting = "harmonic")
-c(type     = attr(edges, "network_type"),
-  counting = attr(edges, "counting"),
-  sim      = attr(edges, "similarity"))
-
 summary(edges)
 
